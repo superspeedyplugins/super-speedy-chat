@@ -95,7 +95,7 @@
                 '<a href="' + (config.login_url || '/wp-login.php') + '">Log in</a> or <a href="' + (config.register_url || '/wp-login.php?action=register') + '">create an account</a> to save your chat history.' +
             '</div>' +
             '<div class="ssc-input-area">' +
-                '<textarea id="ssc-input" rows="1" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
+                '<textarea id="ssc-input" rows="2" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
                 '<button class="ssc-send-btn" id="ssc-send-btn">Send</button>' +
             '</div>';
 

@@ -78,6 +78,33 @@ require_once $ssc_loader;
 header( 'Content-Type: application/json; charset=utf-8' );
 header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 
+// Rate limiting for send and session endpoints.
+if ( in_array( $ssc_command, array( 'send', 'session' ), true ) ) {
+    $ssc_rate_key  = 'ssc_rate_' . md5( isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : 'unknown' );
+    $ssc_rate_data = get_transient( $ssc_rate_key );
+
+    if ( $ssc_rate_data === false ) {
+        $ssc_rate_data = array( 'count' => 0, 'window_start' => time() );
+    }
+
+    $ssc_rate_window = 60; // 1 minute window
+    $ssc_rate_limit  = ( $ssc_command === 'send' ) ? 15 : 10; // 15 messages/min, 10 sessions/min
+
+    // Reset window if expired.
+    if ( ( time() - $ssc_rate_data['window_start'] ) > $ssc_rate_window ) {
+        $ssc_rate_data = array( 'count' => 0, 'window_start' => time() );
+    }
+
+    $ssc_rate_data['count']++;
+    set_transient( $ssc_rate_key, $ssc_rate_data, $ssc_rate_window );
+
+    if ( $ssc_rate_data['count'] > $ssc_rate_limit ) {
+        http_response_code( 429 );
+        echo json_encode( array( 'error' => 'Too many requests. Please wait a moment.' ) );
+        die();
+    }
+}
+
 $ssc_response = null;
 
 switch ( $ssc_command ) {

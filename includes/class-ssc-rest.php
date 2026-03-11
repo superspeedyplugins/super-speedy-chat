@@ -78,6 +78,41 @@ if ( ! class_exists( 'SSC_REST' ) ) {
         }
 
         // -------------------------------------------------------------------
+        // Rate Limiting
+        // -------------------------------------------------------------------
+
+        /**
+         * Check rate limit for an action. Returns true if allowed, WP_Error if exceeded.
+         *
+         * @param string $action   Action name (e.g. 'send', 'session').
+         * @param int    $limit    Max requests per window.
+         * @param int    $window   Window in seconds.
+         * @return true|WP_Error
+         */
+        private static function check_rate_limit( $action, $limit = 15, $window = 60 ) {
+            $ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
+            $key = 'ssc_rate_' . $action . '_' . md5( $ip );
+
+            $data = get_transient( $key );
+            if ( $data === false ) {
+                $data = array( 'count' => 0, 'window_start' => time() );
+            }
+
+            if ( ( time() - $data['window_start'] ) > $window ) {
+                $data = array( 'count' => 0, 'window_start' => time() );
+            }
+
+            $data['count']++;
+            set_transient( $key, $data, $window );
+
+            if ( $data['count'] > $limit ) {
+                return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'super-speedy-chat' ), array( 'status' => 429 ) );
+            }
+
+            return true;
+        }
+
+        // -------------------------------------------------------------------
         // Visitor Handlers
         // -------------------------------------------------------------------
 
@@ -86,6 +121,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Creates or resumes a session. Returns conversation_id and visitor_hash.
          */
         public function handle_session( $request ) {
+            $rate_check = self::check_rate_limit( 'session', 10, 60 );
+            if ( is_wp_error( $rate_check ) ) {
+                return $rate_check;
+            }
+
             $visitor_hash = SSC_Session::get_or_create_visitor_hash();
             $conversation = SSC_Session::get_or_create_conversation( $visitor_hash );
 
@@ -114,6 +154,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Visitor sends a message.
          */
         public function handle_send( $request ) {
+            $rate_check = self::check_rate_limit( 'send', 15, 60 );
+            if ( is_wp_error( $rate_check ) ) {
+                return $rate_check;
+            }
+
             $visitor_hash = SSC_Session::get_visitor_hash();
             if ( ! $visitor_hash ) {
                 return new WP_Error( 'no_session', __( 'No active session. Please refresh the page.', 'super-speedy-chat' ), array( 'status' => 403 ) );
