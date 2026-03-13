@@ -5,14 +5,14 @@ Plugin URI: https://www.superspeedyplugins.com
 Author: Dave Hilditch (Super Speedy Plugins)
 Author URI: https://www.superspeedyplugins.com
 Text Domain: super-speedy-chat
-Version: 1.03
+Version: 1.05.2
 Description: The fastest live chat plugin for WordPress. Ultra-fast AJAX via mu-plugin, visitor-to-admin chat with email fallback.
 */
 
 if ( ! defined( 'ABSPATH' ) ) {
     return;
 }
-
+https://maps.app.goo.gl/8v6XrjZNW2C29PZx5
 // Load super-speedy-settings submodule (skip if loaded from multisite ultra ajax context)
 if ( function_exists( 'wp_next_scheduled' ) ) {
     require_once( plugin_dir_path( __FILE__ ) . 'super-speedy-settings/super-speedy-settings.php' );
@@ -45,6 +45,8 @@ require_once SSC_DIR . 'includes/class-ssc-settings.php';
 require_once SSC_DIR . 'includes/class-ssc-email.php';
 require_once SSC_DIR . 'includes/class-ssc-mu-installer.php';
 require_once SSC_DIR . 'includes/class-ssc-rest.php';
+require_once SSC_DIR . 'includes/class-ssc-canned.php';
+require_once SSC_DIR . 'includes/class-ssc-discord.php';
 
 // Activation hook: create DB tables and install mu-plugin
 register_activation_hook( __FILE__, function() {
@@ -61,11 +63,18 @@ register_deactivation_hook( __FILE__, function() {
 add_action( 'plugins_loaded', 'ssc_init_plugin' );
 
 function ssc_init_plugin() {
-    // Register admin menu
+    // Upgrade DB if needed.
+    $current_db = get_option( 'ssc_db_version', '0' );
+    if ( version_compare( $current_db, SSC_DB::DB_VERSION, '<' ) ) {
+        SSC_DB::create_tables();
+    }
+
+    // Register admin menu.
     if ( is_admin() ) {
         $admin = new SSC_Admin();
         $admin->init();
     }
+
 }
 
 

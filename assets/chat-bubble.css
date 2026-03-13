@@ -300,9 +300,10 @@
     font-size: 14px;
     font-family: inherit;
     resize: none;
-    max-height: 60px;
-    min-height: 20px;
-    height: 36px;
+    max-height: 80px !important;
+    min-height: 20px !important;
+    height: 40px !important;
+    padding:5px!important;
     line-height: 1.4;
     outline: none;
     transition: border-color 0.2s;

@@ -68,6 +68,47 @@ if ( ! class_exists( 'SSC_REST' ) ) {
                 'callback'            => array( $this, 'handle_admin_close' ),
                 'permission_callback' => array( $this, 'check_admin_permission' ),
             ) );
+
+            // Admin: canned responses CRUD.
+            register_rest_route( self::REST_NAMESPACE, '/admin/canned', array(
+                array(
+                    'methods'             => 'GET',
+                    'callback'            => array( $this, 'handle_canned_list' ),
+                    'permission_callback' => array( $this, 'check_admin_permission' ),
+                ),
+                array(
+                    'methods'             => 'POST',
+                    'callback'            => array( $this, 'handle_canned_create' ),
+                    'permission_callback' => array( $this, 'check_admin_permission' ),
+                ),
+            ) );
+
+            register_rest_route( self::REST_NAMESPACE, '/admin/canned/(?P<id>\d+)', array(
+                array(
+                    'methods'             => 'PUT,PATCH',
+                    'callback'            => array( $this, 'handle_canned_update' ),
+                    'permission_callback' => array( $this, 'check_admin_permission' ),
+                ),
+                array(
+                    'methods'             => 'DELETE',
+                    'callback'            => array( $this, 'handle_canned_delete' ),
+                    'permission_callback' => array( $this, 'check_admin_permission' ),
+                ),
+            ) );
+
+            // Admin: test Discord connection.
+            register_rest_route( self::REST_NAMESPACE, '/admin/discord/test', array(
+                'methods'             => 'POST',
+                'callback'            => array( $this, 'handle_discord_test' ),
+                'permission_callback' => array( $this, 'check_admin_permission' ),
+            ) );
+
+            // Discord bot: incoming message relay (authenticated via shared secret).
+            register_rest_route( self::REST_NAMESPACE, '/discord/incoming', array(
+                'methods'             => 'POST',
+                'callback'            => array( $this, 'handle_discord_incoming' ),
+                'permission_callback' => '__return_true',
+            ) );
         }
 
         /**
@@ -305,6 +346,121 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             ) );
 
             return rest_ensure_response( array( 'success' => true ) );
+        }
+
+        // -------------------------------------------------------------------
+        // Canned Responses Handlers
+        // -------------------------------------------------------------------
+
+        public function handle_canned_list( $request ) {
+            $args = array(
+                'search'   => sanitize_text_field( $request->get_param( 'search' ) ),
+                'category' => sanitize_text_field( $request->get_param( 'category' ) ),
+                'per_page' => absint( $request->get_param( 'per_page' ) ) ?: 50,
+                'page'     => absint( $request->get_param( 'page' ) ) ?: 1,
+            );
+
+            return rest_ensure_response( SSC_Canned::get_all( $args ) );
+        }
+
+        public function handle_canned_create( $request ) {
+            $question = sanitize_textarea_field( $request->get_param( 'question' ) );
+            $response = sanitize_textarea_field( $request->get_param( 'response' ) );
+
+            if ( empty( $response ) ) {
+                return new WP_Error( 'empty_response', __( 'Response text is required.', 'super-speedy-chat' ), array( 'status' => 400 ) );
+            }
+
+            $id = SSC_Canned::add( array(
+                'question_summary'  => $question,
+                'response_text'     => $response,
+                'category'          => sanitize_text_field( $request->get_param( 'category' ) ),
+                'source_message_id' => absint( $request->get_param( 'source_message_id' ) ) ?: null,
+            ) );
+
+            return rest_ensure_response( array( 'id' => $id, 'success' => true ) );
+        }
+
+        public function handle_canned_update( $request ) {
+            $id = absint( $request['id'] );
+
+            $existing = SSC_Canned::get( $id );
+            if ( ! $existing ) {
+                return new WP_Error( 'not_found', __( 'Canned response not found.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            $data = array();
+            if ( $request->get_param( 'question' ) !== null ) {
+                $data['question_summary'] = sanitize_textarea_field( $request->get_param( 'question' ) );
+            }
+            if ( $request->get_param( 'response' ) !== null ) {
+                $data['response_text'] = sanitize_textarea_field( $request->get_param( 'response' ) );
+            }
+            if ( $request->get_param( 'category' ) !== null ) {
+                $data['category'] = sanitize_text_field( $request->get_param( 'category' ) );
+            }
+
+            SSC_Canned::update( $id, $data );
+
+            return rest_ensure_response( array( 'success' => true ) );
+        }
+
+        public function handle_canned_delete( $request ) {
+            $id = absint( $request['id'] );
+
+            $existing = SSC_Canned::get( $id );
+            if ( ! $existing ) {
+                return new WP_Error( 'not_found', __( 'Canned response not found.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            SSC_Canned::delete( $id );
+
+            return rest_ensure_response( array( 'success' => true ) );
+        }
+
+        /**
+         * POST /ssc/v1/discord/incoming
+         * Receives messages from the Discord bot relay.
+         * Authenticated via X-SSC-Secret header (shared secret).
+         */
+        public function handle_discord_incoming( $request ) {
+            $secret = $request->get_header( 'X-SSC-Secret' );
+            if ( ! SSC_Discord::verify_secret( $secret ) ) {
+                return new WP_Error( 'unauthorized', __( 'Invalid or missing secret.', 'super-speedy-chat' ), array( 'status' => 401 ) );
+            }
+
+            $thread_id   = sanitize_text_field( $request->get_param( 'thread_id' ) );
+            $author_name = sanitize_text_field( $request->get_param( 'author_name' ) );
+            $message     = sanitize_text_field( $request->get_param( 'message' ) );
+
+            if ( empty( $thread_id ) || empty( $message ) ) {
+                return new WP_Error( 'missing_params', __( 'Missing required parameters.', 'super-speedy-chat' ), array( 'status' => 400 ) );
+            }
+
+            if ( empty( $author_name ) ) {
+                $author_name = 'Discord Admin';
+            }
+
+            $message_id = SSC_Discord::handle_incoming( $thread_id, $author_name, $message );
+
+            if ( ! $message_id ) {
+                return new WP_Error( 'not_found', __( 'Thread not found or message could not be created.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            return rest_ensure_response( array( 'success' => true, 'message_id' => $message_id ) );
+        }
+
+        public function handle_discord_test( $request ) {
+            $result = SSC_Discord::test_connection();
+
+            if ( is_wp_error( $result ) ) {
+                return $result;
+            }
+
+            return rest_ensure_response( array(
+                'success'  => true,
+                'bot_name' => isset( $result['username'] ) ? $result['username'] : 'Unknown',
+            ) );
         }
 
         // -------------------------------------------------------------------

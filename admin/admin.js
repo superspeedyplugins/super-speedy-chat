@@ -294,11 +294,17 @@
 
     function appendSingleMessage(msg, thread) {
         var type = msg.participant_type || 'visitor';
-        var html = '<div class="ssc-message ssc-message-' + type + '">' +
+        var cannedBtn = '';
+        if (type === 'admin') {
+            cannedBtn = '<button class="ssc-save-canned-btn" title="Save as canned response" data-msg-id="' + (msg.id || '') + '">&#9733;</button>';
+        }
+
+        var html = '<div class="ssc-message ssc-message-' + type + '" data-msg-text="' + escAttr(msg.message) + '">' +
             '<div class="ssc-message-header">' +
                 '<strong class="ssc-message-sender">' + esc(msg.display_name || 'Unknown') + '</strong>' +
                 '<span class="ssc-message-type ssc-type-' + type + '">' + type + '</span>' +
                 '<span class="ssc-message-time">' + formatDate(msg.created_at) + '</span>' +
+                cannedBtn +
             '</div>' +
             '<div class="ssc-message-body">' + esc(msg.message) + '</div>' +
             '</div>';
@@ -308,6 +314,11 @@
         if (msg.id && parseInt(msg.id, 10) > state.lastMessageId) {
             state.lastMessageId = parseInt(msg.id, 10);
         }
+    }
+
+    function escAttr(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function sendReply(conversationId) {
@@ -336,6 +347,220 @@
             thread.scrollTop = thread.scrollHeight;
         }
     }
+
+    // ---------------------------------------------------------------
+    // Save as Canned Response (in conversation detail)
+    // ---------------------------------------------------------------
+
+    $(document).on('click', '.ssc-save-canned-btn', function () {
+        var $btn = $(this);
+        var $msg = $btn.closest('.ssc-message');
+
+        // Already has a form open? Close it.
+        if ($msg.next('.ssc-canned-form-inline').length) {
+            $msg.next('.ssc-canned-form-inline').remove();
+            return;
+        }
+
+        var responseText = $msg.attr('data-msg-text') || '';
+        var msgId = $btn.data('msg-id') || '';
+
+        // Find the preceding visitor message for the question.
+        var questionText = '';
+        var $prev = $msg.prevAll('.ssc-message-visitor').first();
+        if ($prev.length) {
+            questionText = $prev.attr('data-msg-text') || '';
+        }
+
+        var form = '<div class="ssc-canned-form-inline">' +
+            '<label>Question:</label>' +
+            '<textarea class="ssc-canned-question" rows="2">' + esc(questionText) + '</textarea>' +
+            '<label>Response:</label>' +
+            '<textarea class="ssc-canned-response" rows="3">' + esc(responseText) + '</textarea>' +
+            '<label>Category (optional):</label>' +
+            '<input type="text" class="ssc-canned-category" placeholder="e.g. billing, setup, general" />' +
+            '<div class="ssc-canned-form-actions">' +
+                '<button class="button button-primary ssc-canned-save">Save</button>' +
+                '<button class="button ssc-canned-cancel">Cancel</button>' +
+            '</div>' +
+            '</div>';
+
+        $msg.after(form);
+        var $form = $msg.next('.ssc-canned-form-inline');
+
+        $form.find('.ssc-canned-save').on('click', function () {
+            var data = {
+                question: $form.find('.ssc-canned-question').val().trim(),
+                response: $form.find('.ssc-canned-response').val().trim(),
+                category: $form.find('.ssc-canned-category').val().trim(),
+                source_message_id: msgId
+            };
+
+            if (!data.response) {
+                alert('Response text is required.');
+                return;
+            }
+
+            apiPost('admin/canned', data, function () {
+                $form.html('<p style="color:green;padding:8px 0;">Saved as canned response!</p>');
+                setTimeout(function () { $form.remove(); }, 2000);
+            });
+        });
+
+        $form.find('.ssc-canned-cancel').on('click', function () {
+            $form.remove();
+        });
+    });
+
+    // ---------------------------------------------------------------
+    // Canned Responses Tab
+    // ---------------------------------------------------------------
+
+    var cannedState = { loaded: false };
+
+    // Load canned responses when their tab becomes visible.
+    $(document).on('click', '.super-speedy-chat .nav-tab-wrapper .nav-tab', function () {
+        var idx = $(this).index();
+        // Canned Responses tab index = 5 (0:Chats, 1:General, 2:Display, 3:Behaviour, 4:Email, 5:Canned, 6:Discord, 7:Status)
+        if (idx === 5 && !cannedState.loaded) {
+            cannedState.loaded = true;
+            loadCannedResponses();
+        }
+    });
+
+    var cannedSearchTimeout;
+    $(document).on('input', '#ssc-canned-search', function () {
+        clearTimeout(cannedSearchTimeout);
+        var val = $(this).val();
+        cannedSearchTimeout = setTimeout(function () {
+            loadCannedResponses(val);
+        }, 400);
+    });
+
+    function loadCannedResponses(search) {
+        var params = { per_page: 100 };
+        if (search) params.search = search;
+
+        apiGet('admin/canned', params, function (data) {
+            renderCannedRows(data.items);
+        });
+    }
+
+    function renderCannedRows(items) {
+        var tbody = $('#ssc-canned-tbody');
+        tbody.empty();
+
+        if (!items || items.length === 0) {
+            tbody.html('<tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">No canned responses yet. Open a conversation and click the star icon on any admin message to save it.</td></tr>');
+            return;
+        }
+
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var q = esc(item.question_summary || '');
+            var r = esc(item.response_text || '');
+            if (q.length > 100) q = q.substring(0, 100) + '...';
+            if (r.length > 120) r = r.substring(0, 120) + '...';
+
+            var row = '<tr data-canned-id="' + item.id + '">' +
+                '<td class="ssc-col-question">' + q + '</td>' +
+                '<td class="ssc-col-response">' + r + '</td>' +
+                '<td class="ssc-col-category">' + esc(item.category || '') + '</td>' +
+                '<td class="ssc-col-used">' + (item.usage_count || 0) + '</td>' +
+                '<td class="ssc-col-actions">' +
+                    '<button class="button button-small ssc-canned-edit-btn">Edit</button> ' +
+                    '<button class="button button-small ssc-canned-delete-btn">Delete</button>' +
+                '</td>' +
+                '</tr>';
+            tbody.append(row);
+        }
+    }
+
+    $(document).on('click', '.ssc-canned-edit-btn', function () {
+        var $row = $(this).closest('tr');
+        var id = $row.data('canned-id');
+
+        // Fetch full data and show edit form.
+        apiGet('admin/canned', { per_page: 1, search: '' }, function () {
+            // We already have the data in the row, but let's fetch the full item.
+        });
+
+        // For simplicity, fetch all and find the one we want.
+        apiGet('admin/canned', { per_page: 200 }, function (data) {
+            var item = null;
+            for (var i = 0; i < data.items.length; i++) {
+                if (parseInt(data.items[i].id, 10) === parseInt(id, 10)) {
+                    item = data.items[i];
+                    break;
+                }
+            }
+            if (!item) return;
+
+            var editRow = '<tr class="ssc-canned-edit-row"><td colspan="5">' +
+                '<div class="ssc-canned-edit-form">' +
+                '<label>Question:</label><textarea class="ssc-ce-question" rows="2">' + esc(item.question_summary) + '</textarea>' +
+                '<label>Response:</label><textarea class="ssc-ce-response" rows="3">' + esc(item.response_text) + '</textarea>' +
+                '<label>Category:</label><input type="text" class="ssc-ce-category" value="' + escAttr(item.category || '') + '" />' +
+                '<div class="ssc-canned-form-actions">' +
+                    '<button class="button button-primary ssc-ce-save" data-id="' + id + '">Update</button> ' +
+                    '<button class="button ssc-ce-cancel">Cancel</button>' +
+                '</div></div></td></tr>';
+
+            $row.hide().after(editRow);
+        });
+    });
+
+    $(document).on('click', '.ssc-ce-save', function () {
+        var id = $(this).data('id');
+        var $editRow = $(this).closest('.ssc-canned-edit-row');
+        var data = {
+            question: $editRow.find('.ssc-ce-question').val().trim(),
+            response: $editRow.find('.ssc-ce-response').val().trim(),
+            category: $editRow.find('.ssc-ce-category').val().trim()
+        };
+
+        apiPut('admin/canned/' + id, data, function () {
+            loadCannedResponses($('#ssc-canned-search').val());
+        });
+    });
+
+    $(document).on('click', '.ssc-ce-cancel', function () {
+        var $editRow = $(this).closest('.ssc-canned-edit-row');
+        $editRow.prev('tr').show();
+        $editRow.remove();
+    });
+
+    $(document).on('click', '.ssc-canned-delete-btn', function () {
+        if (!confirm('Delete this canned response?')) return;
+        var id = $(this).closest('tr').data('canned-id');
+
+        apiDelete('admin/canned/' + id, function () {
+            loadCannedResponses($('#ssc-canned-search').val());
+        });
+    });
+
+    // ---------------------------------------------------------------
+    // Discord Test Connection
+    // ---------------------------------------------------------------
+
+    $(document).on('click', '#ssc-discord-test', function () {
+        var $btn = $(this);
+        var $result = $('#ssc-discord-test-result');
+        $btn.prop('disabled', true);
+        $result.text('Testing...').css('color', '');
+
+        apiPost('admin/discord/test', {}, function (data) {
+            $btn.prop('disabled', false);
+            if (data.success) {
+                $result.text('Connected! Bot: ' + data.bot_name).css('color', 'green');
+            } else {
+                $result.text('Failed: ' + (data.message || 'Unknown error')).css('color', 'red');
+            }
+        }, function () {
+            $btn.prop('disabled', false);
+            $result.text('Connection failed. Check your bot token.').css('color', 'red');
+        });
+    });
 
     // ---------------------------------------------------------------
     // API Helpers
@@ -369,6 +594,40 @@
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(data),
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', config.nonce);
+            },
+            success: function (data) {
+                if (onSuccess) onSuccess(data);
+            },
+            error: function (xhr) {
+                if (onError) onError(xhr);
+            }
+        });
+    }
+
+    function apiPut(endpoint, data, onSuccess, onError) {
+        $.ajax({
+            url: config.rest_url + endpoint,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', config.nonce);
+            },
+            success: function (data) {
+                if (onSuccess) onSuccess(data);
+            },
+            error: function (xhr) {
+                if (onError) onError(xhr);
+            }
+        });
+    }
+
+    function apiDelete(endpoint, onSuccess, onError) {
+        $.ajax({
+            url: config.rest_url + endpoint,
+            method: 'DELETE',
             beforeSend: function (xhr) {
                 xhr.setRequestHeader('X-WP-Nonce', config.nonce);
             },

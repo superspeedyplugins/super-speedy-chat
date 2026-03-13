@@ -148,6 +148,9 @@ Following the SSS pattern exactly:
 | `ssc/v1/admin/reply` | POST | Admin | Admin sends reply to conversation |
 | `ssc/v1/admin/close/{id}` | POST | Admin | Close/archive a conversation |
 | `ssc/v1/admin/canned` | GET/POST | Admin | Manage canned responses (v2) |
+| `ssc/v1/admin/canned/{id}` | PUT/DELETE | Admin | Update/delete canned response (v2) |
+| `ssc/v1/admin/discord/test` | POST | Admin | Test Discord bot connection (v2) |
+| `ssc/v1/discord/incoming` | POST | Secret | Receive messages from Discord bot relay (v2) |
 
 ### Front-End Chat Bubble
 
@@ -248,8 +251,13 @@ SuperSpeedySettings_1_0::init(array(
 - Max tokens per response
 - Canned response management (add/edit/delete)
 
-**Integrations Tab (v2/v3):**
-- Discord webhook URL / bot token
+**Discord Tab (v2):**
+- Enable/disable Discord integration
+- Discord bot token
+- Discord channel ID
+- Auto-generated webhook secret + REST endpoint URL (for companion bot config)
+
+**Integrations Tab (v3):**
 - Slack webhook URL
 - Telegram bot token
 - WhatsApp Business API config
@@ -308,23 +316,29 @@ SuperSpeedySettings_1_0::init(array(
 **AJAX URL Bug Fix:**
 - The old plugin references `ajaxurl` which is only defined in wp-admin. The new plugin uses the mu-plugin REST pattern with a known URL (`/wp-json/ssc/v1/...`) localized to JS via `wp_localize_script()`, completely eliminating this issue.
 
-### Version 2.0 — LLM + Discord
-**Goal:** Smart auto-responses and Discord integration for admin notifications/replies
+### Version 2.0 — Canned Responses + Discord (Instant)
+**Goal:** Canned response gathering from live admin replies and instant bidirectional Discord chat
 
 **Features:**
-- [ ] LLM integration — two modes:
-  - **Full conversational**: Send conversation context to LLM API, return response as bot message
-  - **Canned response classifier**: Admin creates canned responses, LLM classifies visitor message and picks the best match (low token usage, prevents misuse)
-- [ ] Canned responses table + admin CRUD interface
-- [ ] LLM settings tab (provider, API key, system prompt, mode selection)
-- [ ] Token usage tracking and daily limits
-- [ ] Discord integration:
-  - Webhook: push new conversations to Discord channel
-  - Bot: receive replies from Discord, push to chat
+- [x] Canned responses table + admin CRUD interface
+- [x] "Save as Canned" button on admin messages in conversation detail
+- [x] Canned responses admin tab with guide and management UI
+- [ ] LLM canned response classifier (future — cheap classifier picks best match for visitor questions)
+- [x] Discord integration — **instant bidirectional**:
+  - **WP → Discord (instant)**: Visitor messages pushed to Discord threads via bot API immediately on send
+  - **Discord → WP (instant)**: Node.js companion bot connected to Discord Gateway, relays messages to WordPress REST endpoint immediately
   - Thread-per-conversation model (each visitor conversation = Discord thread)
+  - Authenticated bot-to-WP communication via shared secret (X-SSC-Secret header)
+  - `fastcgi_finish_request()` used in mu-plugin to avoid blocking visitor response
+  - **No WP-Cron polling** — all message delivery is instant
+- [x] Discord admin settings tab with step-by-step setup guide
+- [x] Companion Node.js bot included in plugin (`bot/` directory)
 - [ ] Typing indicator (show when admin is composing)
 - [ ] Admin online/offline status indicator on bubble
 - [ ] Conversation assignment (assign to specific admin)
+
+**Architecture note (SaaS roadmap for v5+):**
+The Discord → WP endpoint (`/ssc/v1/discord/incoming`) authenticates via a shared secret, not WordPress cookies. This means any authenticated source can push messages — in v5+, a hosted SaaS bot service could replace the self-hosted companion bot, removing the Node.js requirement for site owners.
 
 ### Version 3.0 — Messaging Platforms + CRM
 **Goal:** Full messaging platform coverage and admin CRM-like interface

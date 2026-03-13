@@ -120,6 +120,23 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 'key' => 'ssc_email_from_name', 'default' => get_bloginfo( 'name' ),
             ) );
 
+            // ---- Canned Responses section ----
+            add_settings_section( 'ssc_section_canned', '', array( $this, 'section_canned_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+
+            // ---- Discord section ----
+            add_settings_section( 'ssc_section_discord', '', array( $this, 'section_discord_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+
+            add_settings_field( 'ssc_discord_enabled', __( 'Enable Discord', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_discord', array(
+                'key' => 'ssc_discord_enabled', 'label' => __( 'Enable Discord integration', 'super-speedy-chat' ), 'default' => false,
+            ) );
+            add_settings_field( 'ssc_discord_bot_token', __( 'Bot Token', 'super-speedy-chat' ), array( $this, 'field_password' ), 'ssc', 'ssc_section_discord', array(
+                'key' => 'ssc_discord_bot_token', 'default' => '', 'description' => __( 'Your Discord bot token. Keep this secret.', 'super-speedy-chat' ),
+            ) );
+            add_settings_field( 'ssc_discord_channel_id', __( 'Channel ID', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_discord', array(
+                'key' => 'ssc_discord_channel_id', 'default' => '', 'description' => __( 'The Discord channel where chat threads will be created.', 'super-speedy-chat' ),
+            ) );
+            add_settings_field( 'ssc_discord_bot_info', __( 'Bot Connection Info', 'super-speedy-chat' ), array( $this, 'field_discord_bot_info' ), 'ssc', 'ssc_section_discord' );
+
             // ---- Status section ----
             add_settings_section( 'ssc_section_status', '', array( $this, 'section_status_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
         }
@@ -156,6 +173,8 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 'display_names' => __( 'Display Names', 'super-speedy-chat' ),
                 'behaviour'     => __( 'Behaviour', 'super-speedy-chat' ),
                 'email'         => __( 'Email', 'super-speedy-chat' ),
+                'canned'        => __( 'Canned Responses', 'super-speedy-chat' ),
+                'discord'       => __( 'Discord', 'super-speedy-chat' ),
                 'status'        => __( 'Status', 'super-speedy-chat' ),
             );
 
@@ -418,6 +437,127 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             echo '<p class="description">' . esc_html__( 'Your personal display name shown in chat when using individual mode. Saved per-user.', 'super-speedy-chat' ) . '</p>';
         }
 
+        public function field_password( $args ) {
+            $key         = $args['key'];
+            $default     = isset( $args['default'] ) ? $args['default'] : '';
+            $description = isset( $args['description'] ) ? $args['description'] : '';
+            $value       = SSC_Settings::get_option( $key, $default );
+
+            printf(
+                '<input type="password" name="ssc_options[%s]" value="%s" class="regular-text" autocomplete="off" />',
+                esc_attr( $key ),
+                esc_attr( $value )
+            );
+            if ( $description ) {
+                echo '<p class="description">' . esc_html( $description ) . '</p>';
+            }
+        }
+
+        // ---- Canned Responses section callback ----
+
+        public function section_canned_callback() {
+            ?>
+            <div class="ssc-guide-box">
+                <h3><?php esc_html_e( 'How Canned Responses Work', 'super-speedy-chat' ); ?></h3>
+                <ol>
+                    <li><?php esc_html_e( 'Respond to customer chats as you normally would — from this admin panel or from Discord.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'When you write a particularly good response, click the bookmark icon next to your message in the conversation view.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Edit the question summary and response text, add a category, and save.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Manage all your saved responses below — edit, categorize, or delete them.', 'super-speedy-chat' ); ?></li>
+                </ol>
+                <p><em><?php esc_html_e( 'Coming soon: A lightweight LLM classifier will automatically suggest matching canned responses when visitors ask similar questions, dramatically reducing your response time.', 'super-speedy-chat' ); ?></em></p>
+            </div>
+
+            <div id="ssc-canned-list">
+                <div class="ssc-canned-toolbar">
+                    <input type="search" id="ssc-canned-search" placeholder="<?php esc_attr_e( 'Search responses...', 'super-speedy-chat' ); ?>" class="regular-text" />
+                </div>
+                <table class="wp-list-table widefat fixed striped" id="ssc-canned-table">
+                    <thead>
+                        <tr>
+                            <th class="ssc-col-question"><?php esc_html_e( 'Question', 'super-speedy-chat' ); ?></th>
+                            <th class="ssc-col-response"><?php esc_html_e( 'Response', 'super-speedy-chat' ); ?></th>
+                            <th class="ssc-col-category"><?php esc_html_e( 'Category', 'super-speedy-chat' ); ?></th>
+                            <th class="ssc-col-used"><?php esc_html_e( 'Used', 'super-speedy-chat' ); ?></th>
+                            <th class="ssc-col-actions"><?php esc_html_e( 'Actions', 'super-speedy-chat' ); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ssc-canned-tbody">
+                        <tr><td colspan="5" class="ssc-loading-row"><?php esc_html_e( 'Loading...', 'super-speedy-chat' ); ?></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <?php
+        }
+
+        // ---- Discord section callback ----
+
+        public function section_discord_callback() {
+            ?>
+            <div class="ssc-guide-box">
+                <h3><?php esc_html_e( 'Discord Integration — Instant Bidirectional Chat', 'super-speedy-chat' ); ?></h3>
+                <p><?php esc_html_e( 'Chat with your visitors in real-time directly from Discord. Visitor messages appear instantly in Discord threads, and your Discord replies are delivered to visitors instantly.', 'super-speedy-chat' ); ?></p>
+
+                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 1: Create a Discord Bot', 'super-speedy-chat' ); ?></h4>
+                <ol>
+                    <li><?php
+                        printf(
+                            __( 'Go to the <a href="%s" target="_blank">Discord Developer Portal</a> and create a New Application.', 'super-speedy-chat' ),
+                            'https://discord.com/developers/applications'
+                        );
+                    ?></li>
+                    <li><?php esc_html_e( 'Go to the Bot tab and click "Reset Token" to get your bot token. Copy it.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Under Privileged Gateway Intents, enable MESSAGE CONTENT INTENT.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Go to OAuth2 > URL Generator. Select the "bot" scope.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Select permissions: Send Messages, Create Public Threads, Send Messages in Threads, Read Message History.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Copy the generated URL, open it, and add the bot to your server.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Enable Developer Mode in Discord (User Settings > Advanced), right-click your channel, Copy Channel ID.', 'super-speedy-chat' ); ?></li>
+                </ol>
+
+                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 2: Configure Settings Below & Save', 'super-speedy-chat' ); ?></h4>
+                <p><?php esc_html_e( 'Enter your bot token and channel ID below, enable the integration, and click Save. Visitor messages will start appearing in Discord immediately.', 'super-speedy-chat' ); ?></p>
+
+                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 3: Install the Companion Bot (for Discord → WordPress replies)', 'super-speedy-chat' ); ?></h4>
+                <p><?php esc_html_e( 'To receive your Discord replies back in WordPress instantly, install the companion Node.js bot on your server:', 'super-speedy-chat' ); ?></p>
+                <ol>
+                    <li><?php esc_html_e( 'Requires Node.js 18+ on your server.', 'super-speedy-chat' ); ?></li>
+                    <li><?php
+                        printf(
+                            __( 'Copy the <code>bot/</code> folder from <code>%s</code> to a location on your server.', 'super-speedy-chat' ),
+                            esc_html( SSC_DIR . 'bot/' )
+                        );
+                    ?></li>
+                    <li><?php esc_html_e( 'Run: npm install', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Copy .env.example to .env and fill in the values from "Bot Connection Info" below.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'Run: node discord-bot.js (or use PM2/systemd to keep it running).', 'super-speedy-chat' ); ?></li>
+                </ol>
+                <p><em><?php esc_html_e( 'Without the companion bot, visitor messages still go to Discord instantly, but your Discord replies won\'t reach visitors until you reply from wp-admin.', 'super-speedy-chat' ); ?></em></p>
+                <p><button type="button" class="button" id="ssc-discord-test"><?php esc_html_e( 'Test Connection', 'super-speedy-chat' ); ?></button> <span id="ssc-discord-test-result"></span></p>
+            </div>
+            <?php
+        }
+
+        /**
+         * Display the webhook secret and site URL for the Discord bot config.
+         */
+        public function field_discord_bot_info() {
+            $secret   = SSC_Discord::get_webhook_secret();
+            $rest_url = rest_url( 'ssc/v1/discord/incoming' );
+            ?>
+            <div style="background:#f9f9f9; border:1px solid #e0e0e0; border-radius:4px; padding:12px; max-width:600px;">
+                <p style="margin-top:0;">
+                    <strong><?php esc_html_e( 'Webhook Secret:', 'super-speedy-chat' ); ?></strong><br>
+                    <code id="ssc-discord-secret" style="user-select:all; font-size:12px;"><?php echo esc_html( $secret ); ?></code>
+                </p>
+                <p style="margin-bottom:0;">
+                    <strong><?php esc_html_e( 'WordPress Endpoint URL:', 'super-speedy-chat' ); ?></strong><br>
+                    <code id="ssc-discord-endpoint" style="user-select:all; font-size:12px;"><?php echo esc_html( $rest_url ); ?></code>
+                </p>
+            </div>
+            <p class="description"><?php esc_html_e( 'Copy these values into your bot\'s .env file.', 'super-speedy-chat' ); ?></p>
+            <?php
+        }
+
         // ---- Status section callback ----
 
         public function section_status_callback() {
@@ -466,13 +606,13 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             // Checkboxes.
-            $cb_keys = array( 'ssc_enabled', 'ssc_mu_enabled', 'ssc_play_sounds', 'ssc_require_login', 'ssc_admin_email_enabled', 'ssc_visitor_email_enabled' );
+            $cb_keys = array( 'ssc_enabled', 'ssc_mu_enabled', 'ssc_play_sounds', 'ssc_require_login', 'ssc_admin_email_enabled', 'ssc_visitor_email_enabled', 'ssc_discord_enabled' );
             foreach ( $cb_keys as $k ) {
                 $sanitized[ $k ] = ! empty( $input[ $k ] );
             }
 
             // Text.
-            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name' );
+            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_discord_bot_token', 'ssc_discord_channel_id' );
             foreach ( $text_keys as $k ) {
                 $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_text_field( $input[ $k ] ) : '';
             }
@@ -501,6 +641,12 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             if ( isset( $_POST['ssc_my_display_name'] ) ) {
                 $my_name = sanitize_text_field( $_POST['ssc_my_display_name'] );
                 update_user_meta( get_current_user_id(), 'ssc_chat_display_name', $my_name );
+            }
+
+            // Preserve the auto-generated webhook secret (not submitted via form).
+            $existing = get_option( 'ssc_options', array() );
+            if ( ! empty( $existing['ssc_discord_webhook_secret'] ) ) {
+                $sanitized['ssc_discord_webhook_secret'] = $existing['ssc_discord_webhook_secret'];
             }
 
             // Trigger mu-plugin install/update on save.

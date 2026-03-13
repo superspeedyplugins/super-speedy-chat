@@ -1,0 +1,12 @@
+{
+  "name": "ssc-discord-bot",
+  "version": "1.0.0",
+  "description": "Super Speedy Chat - Discord relay bot for instant bidirectional messaging",
+  "main": "discord-bot.js",
+  "scripts": {
+    "start": "node discord-bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1"
+  }
+}

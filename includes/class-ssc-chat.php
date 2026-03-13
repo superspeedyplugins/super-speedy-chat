@@ -74,6 +74,12 @@ if ( ! class_exists( 'SSC_Chat' ) ) {
                 SSC_Email::notify_admin_new_conversation( $conversation );
             }
 
+            // Push to Discord instantly.
+            if ( class_exists( 'SSC_Discord' ) && SSC_Discord::is_enabled() ) {
+                $sender = isset( $participant->display_name ) ? $participant->display_name : 'Visitor';
+                SSC_Discord::push_message( $conversation->id, $sender, $message, true );
+            }
+
             return array(
                 'message_id'      => $message_id,
                 'conversation_id' => $conversation->id,
@@ -135,6 +141,12 @@ if ( ! class_exists( 'SSC_Chat' ) ) {
             // Email the visitor if they have an email and are offline.
             if ( ! empty( $conversation->visitor_email ) ) {
                 SSC_Email::notify_visitor_reply( $conversation, $message );
+            }
+
+            // Push admin reply to Discord instantly.
+            if ( class_exists( 'SSC_Discord' ) && SSC_Discord::is_enabled() ) {
+                $admin_name = SSC_Admin::get_admin_chat_name( $admin_user_id );
+                SSC_Discord::push_message( $conversation_id, $admin_name, $message, false );
             }
 
             return array(

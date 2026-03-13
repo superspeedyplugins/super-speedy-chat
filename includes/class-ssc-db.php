@@ -7,7 +7,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
     class SSC_DB {
 
-        const DB_VERSION = '1.0.0';
+        const DB_VERSION = '2.0.0';
 
         /**
          * Get the full table name with prefix.
@@ -28,6 +28,9 @@ if ( ! class_exists( 'SSC_DB' ) ) {
             $conversations_table = self::table( 'ssc_conversations' );
             $participants_table  = self::table( 'ssc_participants' );
             $messages_table      = self::table( 'ssc_messages' );
+
+            $canned_table = self::table( 'ssc_canned_responses' );
+            $discord_table = self::table( 'ssc_discord_threads' );
 
             $sql = "CREATE TABLE {$conversations_table} (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -75,6 +78,32 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 INDEX idx_conv_id (conversation_id, id),
                 INDEX idx_participant_id (participant_id),
                 INDEX idx_created_at (created_at)
+            ) {$charset_collate};
+            CREATE TABLE {$canned_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                question_summary TEXT NOT NULL,
+                response_text TEXT NOT NULL,
+                category VARCHAR(100) DEFAULT '',
+                usage_count INT UNSIGNED DEFAULT 0,
+                source_message_id BIGINT UNSIGNED NULL,
+                created_by BIGINT UNSIGNED NOT NULL,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                INDEX idx_category (category),
+                INDEX idx_created_by (created_by)
+            ) {$charset_collate};
+
+            CREATE TABLE {$discord_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                conversation_id BIGINT UNSIGNED NOT NULL,
+                discord_thread_id VARCHAR(64) NOT NULL,
+                discord_channel_id VARCHAR(64) NOT NULL,
+                last_synced_discord_msg_id VARCHAR(64) DEFAULT '0',
+                last_synced_wp_msg_id BIGINT UNSIGNED DEFAULT 0,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE INDEX idx_conversation (conversation_id),
+                INDEX idx_thread (discord_thread_id)
             ) {$charset_collate};";
 
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';

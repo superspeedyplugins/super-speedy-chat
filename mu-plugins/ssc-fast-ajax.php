@@ -73,6 +73,7 @@ if ( ! file_exists( $ssc_loader ) ) {
 // Load required class files.
 require_once $ssc_plugin_dir . 'includes/class-ssc-db.php';
 require_once $ssc_plugin_dir . 'includes/class-ssc-settings.php';
+require_once $ssc_plugin_dir . 'includes/class-ssc-discord.php';
 require_once $ssc_loader;
 
 header( 'Content-Type: application/json; charset=utf-8' );
@@ -127,6 +128,20 @@ switch ( $ssc_command ) {
 
 if ( $ssc_response !== null ) {
     echo json_encode( $ssc_response );
+
+    // Send response to client immediately, then handle Discord push.
+    if ( function_exists( 'fastcgi_finish_request' ) ) {
+        fastcgi_finish_request();
+    }
+
+    // Push visitor message to Discord instantly (after response is sent).
+    if ( $ssc_command === 'send' && ! empty( $ssc_response['message_id'] ) && class_exists( 'SSC_Discord' ) && SSC_Discord::is_enabled() ) {
+        $ssc_discord_msg = isset( $ssc_input['message'] ) ? sanitize_text_field( $ssc_input['message'] ) : '';
+        if ( ! empty( $ssc_discord_msg ) ) {
+            SSC_Discord::push_message( $ssc_response['conversation_id'], 'Visitor', $ssc_discord_msg, true );
+        }
+    }
+
     die();
 }
 
