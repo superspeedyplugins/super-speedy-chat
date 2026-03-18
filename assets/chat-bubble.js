@@ -120,6 +120,12 @@
             }
         });
 
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && state.open) {
+                closeChat();
+            }
+        });
+
         // Auto-grow textarea
         document.getElementById('ssc-input').addEventListener('input', function () {
             this.style.height = 'auto';

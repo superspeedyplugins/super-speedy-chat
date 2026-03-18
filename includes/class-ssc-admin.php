@@ -644,9 +644,15 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             // Preserve the auto-generated webhook secret (not submitted via form).
-            $existing = get_option( 'ssc_options', array() );
-            if ( ! empty( $existing['ssc_discord_webhook_secret'] ) ) {
-                $sanitized['ssc_discord_webhook_secret'] = $existing['ssc_discord_webhook_secret'];
+            // Check $input first (covers direct update_option calls from get_webhook_secret),
+            // then fall back to existing DB value (covers form submissions).
+            if ( ! empty( $input['ssc_discord_webhook_secret'] ) ) {
+                $sanitized['ssc_discord_webhook_secret'] = sanitize_text_field( $input['ssc_discord_webhook_secret'] );
+            } else {
+                $existing = get_option( 'ssc_options', array() );
+                if ( ! empty( $existing['ssc_discord_webhook_secret'] ) ) {
+                    $sanitized['ssc_discord_webhook_secret'] = $existing['ssc_discord_webhook_secret'];
+                }
             }
 
             // Trigger mu-plugin install/update on save.

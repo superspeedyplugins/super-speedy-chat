@@ -5,14 +5,13 @@ Plugin URI: https://www.superspeedyplugins.com
 Author: Dave Hilditch (Super Speedy Plugins)
 Author URI: https://www.superspeedyplugins.com
 Text Domain: super-speedy-chat
-Version: 1.05.2
+Version: 1.05.4
 Description: The fastest live chat plugin for WordPress. Ultra-fast AJAX via mu-plugin, visitor-to-admin chat with email fallback.
 */
 
 if ( ! defined( 'ABSPATH' ) ) {
     return;
 }
-https://maps.app.goo.gl/8v6XrjZNW2C29PZx5
 // Load super-speedy-settings submodule (skip if loaded from multisite ultra ajax context)
 if ( function_exists( 'wp_next_scheduled' ) ) {
     require_once( plugin_dir_path( __FILE__ ) . 'super-speedy-settings/super-speedy-settings.php' );

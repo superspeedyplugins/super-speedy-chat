@@ -19,11 +19,16 @@
     --ssc-widget-height: 500px;
 }
 
-/* Trigger Button */
-#ssc-trigger {
+/* Wrapper - anchors the entire chat to the viewport corner */
+#ssc-wrapper {
     position: fixed;
     bottom: 20px;
     right: 20px;
+    z-index: 99998;
+}
+
+/* Trigger Button */
+#ssc-trigger {
     width: var(--ssc-bubble-size);
     height: var(--ssc-bubble-size);
     border-radius: 50%;
@@ -32,7 +37,6 @@
     border: none;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    z-index: 99998;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -73,14 +77,14 @@
 }
 
 /* Position: bottom-left */
-.ssc-position-bottom-left #ssc-trigger {
+.ssc-position-bottom-left {
     right: auto;
     left: 20px;
 }
 
 .ssc-position-bottom-left #ssc-widget {
     right: auto;
-    left: 20px;
+    left: 0;
 }
 
 /* Unread Badge */
@@ -109,9 +113,9 @@
 
 /* Chat Widget */
 #ssc-widget {
-    position: fixed;
-    bottom: 90px;
-    right: 20px;
+    position: absolute;
+    bottom: calc(var(--ssc-bubble-size) + 10px);
+    right: 0;
     width: var(--ssc-widget-width);
     height: var(--ssc-widget-height);
     max-height: calc(100vh - 120px);
@@ -450,7 +454,17 @@
 
 /* Mobile responsive */
 @media (max-width: 480px) {
+    #ssc-wrapper {
+        right: 10px;
+        bottom: 10px;
+    }
+
+    .ssc-position-bottom-left {
+        left: 10px;
+    }
+
     #ssc-widget {
+        position: fixed;
         width: calc(100vw - 20px);
         height: calc(100vh - 100px);
         right: 10px;
@@ -458,10 +472,5 @@
         bottom: 80px;
         max-height: none;
         border-radius: 12px;
-    }
-
-    .ssc-position-bottom-left #ssc-widget {
-        left: 10px;
-        right: 10px;
     }
 }
