@@ -79,11 +79,12 @@
         }
         headerHtml += '<span class="ssc-header-title">' + escapeHtml(config.window_title || 'Chat') + '</span>';
         headerHtml += '<span class="ssc-header-status" id="ssc-status"></span>';
+        headerHtml += '<button class="ssc-header-close" id="ssc-header-close" aria-label="Close chat"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>';
         headerHtml += '</div>';
 
         widget.innerHTML =
             headerHtml +
-            '<div class="ssc-messages" id="ssc-messages"></div>' +
+            '<div class="ssc-messages" id="ssc-messages"><div class="ssc-scroll-anchor"></div></div>' +
             '<div class="ssc-email-prompt" id="ssc-email-prompt">' +
                 '<p>Leave your email and we\'ll notify you when we reply:</p>' +
                 '<div class="ssc-email-prompt-form">' +
@@ -97,7 +98,8 @@
             '<div class="ssc-input-area">' +
                 '<textarea id="ssc-input" rows="2" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
                 '<button class="ssc-send-btn" id="ssc-send-btn">Send</button>' +
-            '</div>';
+            '</div>' +
+            '<div class="ssc-sponsor-link"><a href="https://www.superspeedyplugins.com/get-super-speedy-chat" target="_blank" rel="noopener">Get your own Super Speedy Chat <span>FREE!</span></a></div>';
 
         wrapper.appendChild(trigger);
         wrapper.appendChild(widget);
@@ -105,6 +107,7 @@
 
         // Event listeners
         trigger.addEventListener('click', toggleChat);
+        document.getElementById('ssc-header-close').addEventListener('click', closeChat);
         document.getElementById('ssc-send-btn').addEventListener('click', sendMessage);
         document.getElementById('ssc-input').addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -133,10 +136,24 @@
             resetIdle();
         });
 
+        // Resize widget when virtual keyboard opens/closes on mobile
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+        }
+
         // Preload sounds
         if (config.sounds_enabled) {
             preloadSounds();
         }
+    }
+
+    function handleViewportResize() {
+        if (!state.open) return;
+        var widget = document.getElementById('ssc-widget');
+        if (!widget) return;
+        var vv = window.visualViewport;
+        widget.style.height = vv.height + 'px';
+        widget.style.top = vv.offsetTop + 'px';
     }
 
     // ---------------------------------------------------------------
@@ -190,6 +207,9 @@
         widget.classList.add('ssc-visible');
         trigger.classList.add('ssc-open');
 
+        // Lock body scroll on mobile to prevent background scrolling
+        document.body.classList.add('ssc-chat-open');
+
         playSound('open');
 
         // Clear unread.
@@ -217,6 +237,13 @@
         widget.classList.add('ssc-hiding');
         trigger.classList.remove('ssc-open');
 
+        // Unlock body scroll
+        document.body.classList.remove('ssc-chat-open');
+
+        // Clear any inline viewport sizing from keyboard resize
+        widget.style.height = '';
+        widget.style.top = '';
+
         playSound('close');
         stopPolling();
 
@@ -237,7 +264,7 @@
             state.visitorHash = data.visitor_hash;
 
             var messagesEl = document.getElementById('ssc-messages');
-            messagesEl.innerHTML = '';
+            messagesEl.innerHTML = '<div class="ssc-scroll-anchor"></div>';
 
             // Show welcome message.
             if (config.welcome_message) {
@@ -317,7 +344,8 @@
         }
 
         div.innerHTML = html;
-        messagesEl.appendChild(div);
+        var anchor = messagesEl.querySelector('.ssc-scroll-anchor');
+        messagesEl.insertBefore(div, anchor);
 
         // Update lastMessageId.
         if (msg.id && parseInt(msg.id, 10) > state.lastMessageId) {
@@ -335,7 +363,8 @@
         div.className = 'ssc-msg ssc-msg-system';
         if (extraClass) div.className += ' ' + extraClass;
         div.innerHTML = '<p class="ssc-msg-text">' + escapeHtml(text) + '</p>';
-        messagesEl.appendChild(div);
+        var anchor = messagesEl.querySelector('.ssc-scroll-anchor');
+        messagesEl.insertBefore(div, anchor);
     }
 
     // ---------------------------------------------------------------

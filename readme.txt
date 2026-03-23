@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.05.2
+Stable tag: 1.06
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,13 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.06 (23rd March 2026) =
+* Improved mobile chat experience — widget now goes full-screen on phones so top messages are always visible
+* Added close button (X) in chat header for easy exit on mobile
+* Fixed background page scrolling when chat is open on mobile devices
+* Added touch scroll containment so finger scrolling stays within the chat messages
+* Fixed chat window overflowing above screen when virtual keyboard opens on mobile
 
 = 1.05 (18th March 2026) =
 * Added instant bidirectional Discord integration — visitor messages pushed to Discord threads, Discord replies relayed back to WordPress in real-time
