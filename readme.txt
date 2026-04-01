@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.06
+Stable tag: 1.07
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,22 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.07 (1st April 2026) =
+* Added LLM auto-reply system — classifies visitor questions against canned responses using OpenAI or Anthropic and auto-sends the best match when admins are away
+* Added LLM Auto-Reply admin settings tab with provider, API key, model, and system prompt configuration
+* Added conversation assignment — assign conversations to specific admin users from the detail sidebar
+* Added "Assigned To" column and assignee filter (All / Unassigned / Assigned to Me) to conversation list
+* Added 3-tier adaptive polling: active, idle (30s), and deep idle (2min) with configurable intervals
+* Added Ultra Ajax-aware polling defaults — faster intervals when mu-plugin is active (1s/3s/10s vs 2s/5s/15s)
+* Added admin notification sounds — plays sound when new visitor messages arrive or waiting count increases
+* Added sound customization settings — message sound selection, open/close sound selection, and volume slider with preview buttons
+* Added honeypot anti-spam field to chat form with server-side validation in both REST and mu-plugin paths
+* Added auto-reply REST endpoint with rate limiting (3/min) for both normal and fast-ajax paths
+* Added bot message support (send_bot_message) for auto-reply and canned response delivery
+* Added 7 KB documentation guides: Quick Start, Customizing Appearance, Canned Responses, LLM Auto-Reply, Managing Conversations, Email Notifications, Ultra Ajax & Performance
+* Database schema updated to v3.0.0 (added assigned_to column on conversations table)
+* Bumped mu-plugin to v1.1.0 with honeypot check, auto-reply route, and updated rate limiting
 
 = 1.06 (23rd March 2026) =
 * Improved mobile chat experience — widget now goes full-screen on phones so top messages are always visible

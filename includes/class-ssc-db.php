@@ -7,7 +7,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
     class SSC_DB {
 
-        const DB_VERSION = '2.0.0';
+        const DB_VERSION = '3.0.0';
 
         /**
          * Get the full table name with prefix.
@@ -45,10 +45,12 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 referrer_url TEXT NULL,
                 ip_address VARCHAR(45) NULL,
                 user_agent VARCHAR(500) NULL,
+                assigned_to BIGINT UNSIGNED NULL,
                 metadata JSON NULL,
                 PRIMARY KEY  (id),
                 INDEX idx_visitor_hash (visitor_hash),
-                INDEX idx_status_last_message (status, last_message_at)
+                INDEX idx_status_last_message (status, last_message_at),
+                INDEX idx_assigned_to (assigned_to)
             ) {$charset_collate};
 
             CREATE TABLE {$participants_table} (
@@ -215,6 +217,22 @@ if ( ! class_exists( 'SSC_DB' ) ) {
         }
 
         /**
+         * Get a participant by conversation and type only (for bot/system participants).
+         */
+        public static function get_participant_by_type( $conversation_id, $type ) {
+            global $wpdb;
+            $table = self::table( 'ssc_participants' );
+
+            return $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table} WHERE conversation_id = %d AND participant_type = %s LIMIT 1",
+                    $conversation_id,
+                    $type
+                )
+            );
+        }
+
+        /**
          * Add a participant and return the inserted ID.
          */
         public static function add_participant( $data ) {
@@ -337,6 +355,15 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 $where_values[]  = $like;
                 $where_values[]  = $like;
                 $where_values[]  = $like;
+            }
+
+            if ( ! empty( $args['assigned_to'] ) ) {
+                if ( $args['assigned_to'] === 'unassigned' ) {
+                    $where_clauses[] = 'assigned_to IS NULL';
+                } else {
+                    $where_clauses[] = 'assigned_to = %d';
+                    $where_values[]  = absint( $args['assigned_to'] );
+                }
             }
 
             $where_sql = '';

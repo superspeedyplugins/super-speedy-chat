@@ -3,7 +3,7 @@
  * Plugin Name: Super Speedy Chat Fast Ajax
  * Description: Speeds up AJAX requests for Super Speedy Chat by bypassing full WordPress loading.
  * Author: Dave Hilditch
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author URI: https://www.superspeedyplugins.com
  */
 
@@ -44,7 +44,7 @@ $ssc_command     = $ssc_route_parts[0] ?? '';
 
 // Only handle known visitor-facing routes in fast mode.
 // Admin routes need full WP auth, so we let those fall through.
-$ssc_fast_commands = array( 'poll', 'send', 'session' );
+$ssc_fast_commands = array( 'poll', 'send', 'session', 'auto-reply' );
 if ( ! in_array( $ssc_command, $ssc_fast_commands, true ) ) {
     return; // Let WordPress handle admin routes normally.
 }
@@ -74,13 +74,16 @@ if ( ! file_exists( $ssc_loader ) ) {
 require_once $ssc_plugin_dir . 'includes/class-ssc-db.php';
 require_once $ssc_plugin_dir . 'includes/class-ssc-settings.php';
 require_once $ssc_plugin_dir . 'includes/class-ssc-discord.php';
+require_once $ssc_plugin_dir . 'includes/class-ssc-canned.php';
+require_once $ssc_plugin_dir . 'includes/class-ssc-llm.php';
+require_once $ssc_plugin_dir . 'includes/class-ssc-chat.php';
 require_once $ssc_loader;
 
 header( 'Content-Type: application/json; charset=utf-8' );
 header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 
 // Rate limiting for send and session endpoints.
-if ( in_array( $ssc_command, array( 'send', 'session' ), true ) ) {
+if ( in_array( $ssc_command, array( 'send', 'session', 'auto-reply' ), true ) ) {
     $ssc_rate_key  = 'ssc_rate_' . md5( isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : 'unknown' );
     $ssc_rate_data = get_transient( $ssc_rate_key );
 
@@ -89,7 +92,8 @@ if ( in_array( $ssc_command, array( 'send', 'session' ), true ) ) {
     }
 
     $ssc_rate_window = 60; // 1 minute window
-    $ssc_rate_limit  = ( $ssc_command === 'send' ) ? 15 : 10; // 15 messages/min, 10 sessions/min
+    $ssc_rate_limits = array( 'send' => 15, 'session' => 10, 'auto-reply' => 3 );
+    $ssc_rate_limit  = isset( $ssc_rate_limits[ $ssc_command ] ) ? $ssc_rate_limits[ $ssc_command ] : 10;
 
     // Reset window if expired.
     if ( ( time() - $ssc_rate_data['window_start'] ) > $ssc_rate_window ) {
@@ -123,6 +127,14 @@ switch ( $ssc_command ) {
 
     case 'session':
         $ssc_response = SSC_REST::fast_session();
+        break;
+
+    case 'auto-reply':
+        $ssc_input = json_decode( file_get_contents( 'php://input' ), true );
+        if ( ! is_array( $ssc_input ) ) {
+            $ssc_input = $_POST;
+        }
+        $ssc_response = SSC_REST::fast_auto_reply( $ssc_input );
         break;
 }
 

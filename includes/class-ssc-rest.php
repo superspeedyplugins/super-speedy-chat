@@ -41,6 +41,13 @@ if ( ! class_exists( 'SSC_REST' ) ) {
                 'permission_callback' => '__return_true',
             ) );
 
+            // Visitor: request auto-reply via LLM canned response classifier.
+            register_rest_route( self::REST_NAMESPACE, '/auto-reply', array(
+                'methods'             => 'POST',
+                'callback'            => array( $this, 'handle_auto_reply' ),
+                'permission_callback' => '__return_true',
+            ) );
+
             // Admin: list conversations.
             register_rest_route( self::REST_NAMESPACE, '/admin/conversations', array(
                 'methods'             => 'GET',
@@ -66,6 +73,13 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             register_rest_route( self::REST_NAMESPACE, '/admin/close/(?P<id>\d+)', array(
                 'methods'             => 'POST',
                 'callback'            => array( $this, 'handle_admin_close' ),
+                'permission_callback' => array( $this, 'check_admin_permission' ),
+            ) );
+
+            // Admin: assign conversation.
+            register_rest_route( self::REST_NAMESPACE, '/admin/assign/(?P<id>\d+)', array(
+                'methods'             => 'POST',
+                'callback'            => array( $this, 'handle_admin_assign' ),
                 'permission_callback' => array( $this, 'check_admin_permission' ),
             ) );
 
@@ -200,6 +214,12 @@ if ( ! class_exists( 'SSC_REST' ) ) {
                 return $rate_check;
             }
 
+            // Honeypot check — silently reject bots.
+            $honeypot = $request->get_param( 'website_url' );
+            if ( ! empty( $honeypot ) ) {
+                return rest_ensure_response( array( 'conversation_id' => 0, 'message_id' => 0 ) );
+            }
+
             $visitor_hash = SSC_Session::get_visitor_hash();
             if ( ! $visitor_hash ) {
                 return new WP_Error( 'no_session', __( 'No active session. Please refresh the page.', 'super-speedy-chat' ), array( 'status' => 403 ) );
@@ -265,6 +285,55 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             return rest_ensure_response( array( 'success' => true ) );
         }
 
+        /**
+         * POST /ssc/v1/auto-reply
+         * Visitor requests an auto-reply via LLM canned response classifier.
+         */
+        public function handle_auto_reply( $request ) {
+            $rate_check = self::check_rate_limit( 'auto_reply', 3, 60 );
+            if ( is_wp_error( $rate_check ) ) {
+                return $rate_check;
+            }
+
+            $visitor_hash = SSC_Session::get_visitor_hash();
+            if ( ! $visitor_hash ) {
+                return new WP_Error( 'no_session', __( 'No active session.', 'super-speedy-chat' ), array( 'status' => 403 ) );
+            }
+
+            $conversation = SSC_DB::get_conversation_by_hash( $visitor_hash );
+            if ( ! $conversation ) {
+                return new WP_Error( 'not_found', __( 'Conversation not found.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            if ( ! SSC_LLM::is_enabled() ) {
+                return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'llm_not_configured' ) );
+            }
+
+            $question = sanitize_text_field( $request->get_param( 'question' ) );
+            if ( empty( $question ) ) {
+                return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'empty_question' ) );
+            }
+
+            $match = SSC_LLM::classify_question( $question );
+
+            if ( ! $match ) {
+                return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'no_match' ) );
+            }
+
+            // Send the matched canned response as a bot message.
+            $result = SSC_Chat::send_bot_message( $conversation->id, $match['response'], 'canned_response' );
+
+            if ( is_wp_error( $result ) ) {
+                return $result;
+            }
+
+            return rest_ensure_response( array(
+                'auto_replied' => true,
+                'message_id'   => $result['message_id'],
+                'canned_id'    => $match['canned_id'],
+            ) );
+        }
+
         // -------------------------------------------------------------------
         // Admin Handlers
         // -------------------------------------------------------------------
@@ -274,10 +343,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          */
         public function handle_admin_conversations( $request ) {
             $args = array(
-                'status'   => sanitize_text_field( $request->get_param( 'status' ) ),
-                'search'   => sanitize_text_field( $request->get_param( 'search' ) ),
-                'per_page' => absint( $request->get_param( 'per_page' ) ) ?: 20,
-                'page'     => absint( $request->get_param( 'page' ) ) ?: 1,
+                'status'      => sanitize_text_field( $request->get_param( 'status' ) ),
+                'search'      => sanitize_text_field( $request->get_param( 'search' ) ),
+                'assigned_to' => sanitize_text_field( $request->get_param( 'assigned_to' ) ),
+                'per_page'    => absint( $request->get_param( 'per_page' ) ) ?: 20,
+                'page'        => absint( $request->get_param( 'page' ) ) ?: 1,
             );
 
             $result = SSC_DB::get_conversations( $args );
@@ -344,6 +414,34 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             SSC_DB::update_conversation( $id, array(
                 'status' => 'closed',
             ) );
+
+            return rest_ensure_response( array( 'success' => true ) );
+        }
+
+        /**
+         * POST /ssc/v1/admin/assign/{id}
+         * Assign a conversation to an admin user.
+         */
+        public function handle_admin_assign( $request ) {
+            $id = absint( $request['id'] );
+
+            $conversation = SSC_DB::get_conversation( $id );
+            if ( ! $conversation ) {
+                return new WP_Error( 'not_found', __( 'Conversation not found.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            $assigned_to = $request->get_param( 'assigned_to' );
+
+            if ( empty( $assigned_to ) || $assigned_to === '0' ) {
+                // Unassign.
+                SSC_DB::update_conversation( $id, array( 'assigned_to' => null ) );
+            } else {
+                $user = get_user_by( 'ID', absint( $assigned_to ) );
+                if ( ! $user || ! $user->has_cap( 'manage_options' ) ) {
+                    return new WP_Error( 'invalid_user', __( 'Invalid admin user.', 'super-speedy-chat' ), array( 'status' => 400 ) );
+                }
+                SSC_DB::update_conversation( $id, array( 'assigned_to' => absint( $assigned_to ) ) );
+            }
 
             return rest_ensure_response( array( 'success' => true ) );
         }
@@ -524,6 +622,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * @return array
          */
         public static function fast_send( $params ) {
+            // Honeypot check — silently reject bots.
+            if ( ! empty( $params['website_url'] ) ) {
+                return array( 'conversation_id' => 0, 'message_id' => 0 );
+            }
+
             $visitor_hash = isset( $_COOKIE['ssc_visitor_hash'] ) ? sanitize_text_field( $_COOKIE['ssc_visitor_hash'] ) : '';
             if ( empty( $visitor_hash ) ) {
                 return array( 'error' => 'No active session.' );
@@ -675,6 +778,58 @@ if ( ! class_exists( 'SSC_REST' ) ) {
                 'visitor_hash'    => $visitor_hash,
                 'messages'        => $messages ? $messages : array(),
                 'status'          => $status,
+            );
+        }
+
+        /**
+         * Handle a fast-ajax auto-reply request directly.
+         * Called from the mu-plugin.
+         *
+         * @param array $params Request parameters.
+         * @return array
+         */
+        public static function fast_auto_reply( $params ) {
+            $visitor_hash = isset( $_COOKIE['ssc_visitor_hash'] ) ? sanitize_text_field( $_COOKIE['ssc_visitor_hash'] ) : '';
+            if ( empty( $visitor_hash ) ) {
+                return array( 'auto_replied' => false, 'reason' => 'no_session' );
+            }
+
+            if ( ! SSC_LLM::is_enabled() ) {
+                return array( 'auto_replied' => false, 'reason' => 'llm_not_configured' );
+            }
+
+            $question = isset( $params['question'] ) ? sanitize_text_field( $params['question'] ) : '';
+            if ( empty( $question ) ) {
+                return array( 'auto_replied' => false, 'reason' => 'empty_question' );
+            }
+
+            global $wpdb;
+            $conv_table = $wpdb->prefix . 'ssc_conversations';
+            $conversation = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$conv_table} WHERE visitor_hash = %s AND status IN ('active','waiting') ORDER BY last_message_at DESC LIMIT 1",
+                    $visitor_hash
+                )
+            );
+
+            if ( ! $conversation ) {
+                return array( 'auto_replied' => false, 'reason' => 'no_conversation' );
+            }
+
+            $match = SSC_LLM::classify_question( $question );
+            if ( ! $match ) {
+                return array( 'auto_replied' => false, 'reason' => 'no_match' );
+            }
+
+            $result = SSC_Chat::send_bot_message( $conversation->id, $match['response'], 'canned_response' );
+            if ( is_wp_error( $result ) ) {
+                return array( 'auto_replied' => false, 'reason' => 'send_error' );
+            }
+
+            return array(
+                'auto_replied' => true,
+                'message_id'   => $result['message_id'],
+                'canned_id'    => $match['canned_id'],
             );
         }
     }

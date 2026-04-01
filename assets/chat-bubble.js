@@ -18,9 +18,12 @@
         pollTimer: null,
         pollInterval: (parseInt(config.poll_interval, 10) || 2000),
         idlePollInterval: (parseInt(config.idle_poll_interval, 10) || 5000),
+        deepIdlePollInterval: (parseInt(config.deep_idle_poll_interval, 10) || (config.ultra_ajax ? 10000 : 15000)),
         currentInterval: 0,
         idleTimeout: null,
+        deepIdleTimeout: null,
         isIdle: false,
+        isDeepIdle: false,
         messageCount: 0,
         unreadCount: 0,
         emailProvided: false,
@@ -96,6 +99,7 @@
                 '<a href="' + (config.login_url || '/wp-login.php') + '">Log in</a> or <a href="' + (config.register_url || '/wp-login.php?action=register') + '">create an account</a> to save your chat history.' +
             '</div>' +
             '<div class="ssc-input-area">' +
+                '<input type="text" id="ssc-hp-field" name="website_url" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" />' +
                 '<textarea id="ssc-input" rows="2" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
                 '<button class="ssc-send-btn" id="ssc-send-btn">Send</button>' +
             '</div>' +
@@ -161,17 +165,18 @@
     // ---------------------------------------------------------------
 
     function preloadSounds() {
+        var volume = (typeof config.sound_volume === 'number') ? config.sound_volume : 0.3;
         var soundFiles = {
-            open: 'woosh.mp3',
-            close: 'woosh.mp3',
-            message: 'msg.mp3'
+            open: config.sound_open || 'woosh.mp3',
+            close: config.sound_open || 'woosh.mp3',
+            message: config.sound_message || 'msg.mp3'
         };
 
         for (var key in soundFiles) {
             if (soundFiles.hasOwnProperty(key)) {
                 var audio = new Audio(config.sounds_url + soundFiles[key]);
                 audio.preload = 'auto';
-                audio.volume = 0.3;
+                audio.volume = volume;
                 state.sounds[key] = audio;
             }
         }
@@ -297,9 +302,11 @@
         var btn = document.getElementById('ssc-send-btn');
         btn.disabled = true;
 
+        var hpField = document.getElementById('ssc-hp-field');
         apiRequest('POST', 'send', {
             message: text,
-            page_url: window.location.href
+            page_url: window.location.href,
+            website_url: hpField ? hpField.value : ''
         }, function (data) {
             btn.disabled = false;
             input.value = '';
@@ -387,6 +394,10 @@
             clearTimeout(state.idleTimeout);
             state.idleTimeout = null;
         }
+        if (state.deepIdleTimeout) {
+            clearTimeout(state.deepIdleTimeout);
+            state.deepIdleTimeout = null;
+        }
     }
 
     function poll() {
@@ -437,6 +448,7 @@
                     // Reset to fast polling when new messages arrive.
                     state.currentInterval = state.pollInterval;
                     state.isIdle = false;
+                    state.isDeepIdle = false;
                 }
             }
 
@@ -450,15 +462,26 @@
         if (state.idleTimeout) {
             clearTimeout(state.idleTimeout);
         }
+        if (state.deepIdleTimeout) {
+            clearTimeout(state.deepIdleTimeout);
+        }
 
-        if (state.isIdle) {
+        if (state.isIdle || state.isDeepIdle) {
             state.isIdle = false;
+            state.isDeepIdle = false;
             state.currentInterval = state.pollInterval;
         }
 
+        // After 30s idle, switch to idle polling.
         state.idleTimeout = setTimeout(function () {
             state.isIdle = true;
             state.currentInterval = state.idlePollInterval;
+
+            // After another 90s (2min total), switch to deep idle polling.
+            state.deepIdleTimeout = setTimeout(function () {
+                state.isDeepIdle = true;
+                state.currentInterval = state.deepIdlePollInterval;
+            }, 90000);
         }, 30000);
     }
 
@@ -494,10 +517,42 @@
 
             state.timeoutTriggered = true;
 
-            if (config.timeout_action === 'show_email_prompt') {
+            var action = config.timeout_action;
+
+            if (action === 'show_email_prompt') {
                 showEmailPrompt();
+            } else if (action === 'llm_canned_response' || action === 'llm_then_email') {
+                requestAutoReply(function () {
+                    if (action === 'llm_then_email') {
+                        showEmailPrompt();
+                    }
+                });
             }
         }, timeout);
+    }
+
+    function requestAutoReply(callback) {
+        // Get the last visitor message as the question.
+        var visitorMsgs = document.querySelectorAll('.ssc-msg-visitor .ssc-msg-text');
+        var question = '';
+        if (visitorMsgs.length > 0) {
+            question = visitorMsgs[visitorMsgs.length - 1].textContent || '';
+        }
+
+        if (!question) {
+            if (callback) callback();
+            return;
+        }
+
+        apiRequest('POST', 'auto-reply', { question: question }, function (data) {
+            if (data.auto_replied) {
+                // The bot message will appear on next poll.
+                pollMessages();
+            }
+            if (callback) callback();
+        }, function () {
+            if (callback) callback();
+        });
     }
 
     function showEmailPrompt() {

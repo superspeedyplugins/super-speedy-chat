@@ -38,11 +38,24 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             $conversation_id = isset( $_GET['conversation_id'] ) ? absint( $_GET['conversation_id'] ) : 0;
             $current_user    = wp_get_current_user();
 
+            // Build admin users list for assignment dropdown.
+            $admin_users = get_users( array( 'role__in' => array( 'administrator' ), 'fields' => array( 'ID', 'display_name' ) ) );
+            $admin_list  = array();
+            foreach ( $admin_users as $au ) {
+                $admin_list[] = array( 'id' => (int) $au->ID, 'name' => $au->display_name );
+            }
+
             wp_localize_script( 'ssc-admin', 'ssc_admin', array(
                 'rest_url'        => esc_url_raw( rest_url( 'ssc/v1/' ) ),
                 'nonce'           => wp_create_nonce( 'wp_rest' ),
                 'conversation_id' => $conversation_id,
                 'admin_name'      => $current_user->display_name,
+                'admin_id'        => $current_user->ID,
+                'admin_users'     => $admin_list,
+                'sounds_enabled'  => (bool) SSC_Settings::get_option( 'ssc_play_sounds', true ),
+                'sounds_url'      => SSC_URL . 'assets/sounds/',
+                'sound_message'   => SSC_Settings::get_option( 'ssc_sound_message', 'msg.mp3' ),
+                'sound_volume'    => absint( SSC_Settings::get_option( 'ssc_sound_volume', 30 ) ) / 100,
             ) );
         }
 
@@ -83,7 +96,12 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             ) );
             add_settings_field( 'ssc_timeout_action', __( 'Timeout Action', 'super-speedy-chat' ), array( $this, 'field_select' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_timeout_action', 'default' => 'show_email_prompt',
-                'options' => array( 'show_email_prompt' => __( 'Show email prompt', 'super-speedy-chat' ), 'do_nothing' => __( 'Do nothing', 'super-speedy-chat' ) ),
+                'options' => array(
+                    'show_email_prompt'    => __( 'Show email prompt', 'super-speedy-chat' ),
+                    'llm_canned_response'  => __( 'Auto-reply with canned response (LLM)', 'super-speedy-chat' ),
+                    'llm_then_email'       => __( 'Auto-reply with LLM, then show email prompt', 'super-speedy-chat' ),
+                    'do_nothing'           => __( 'Do nothing', 'super-speedy-chat' ),
+                ),
             ) );
             add_settings_field( 'ssc_login_prompt_after', __( 'Prompt Login After', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_login_prompt_after', 'default' => 5, 'suffix' => __( 'messages', 'super-speedy-chat' ),
@@ -91,14 +109,35 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             add_settings_field( 'ssc_max_message_length', __( 'Max Message Length', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_max_message_length', 'default' => 500, 'suffix' => __( 'characters', 'super-speedy-chat' ),
             ) );
+            $mu_active = SSC_MU_Installer::is_installed() && SSC_Settings::get_option( 'ssc_mu_enabled', true );
+            $poll_desc = $mu_active
+                ? __( 'Ultra Ajax is active — lower values are fine (default: 1000).', 'super-speedy-chat' )
+                : __( 'Default: 2000. Lower values increase server load.', 'super-speedy-chat' );
+            $idle_desc = $mu_active
+                ? __( 'Polling after 30s idle. Ultra Ajax active (default: 3000).', 'super-speedy-chat' )
+                : __( 'Polling after 30s idle (default: 5000).', 'super-speedy-chat' );
+
             add_settings_field( 'ssc_poll_interval', __( 'Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
-                'key' => 'ssc_poll_interval', 'default' => 2000, 'suffix' => __( 'ms', 'super-speedy-chat' ),
+                'key' => 'ssc_poll_interval', 'default' => $mu_active ? 1000 : 2000, 'suffix' => __( 'ms', 'super-speedy-chat' ), 'description' => $poll_desc,
             ) );
             add_settings_field( 'ssc_idle_poll_interval', __( 'Idle Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
-                'key' => 'ssc_idle_poll_interval', 'default' => 5000, 'suffix' => __( 'ms', 'super-speedy-chat' ),
+                'key' => 'ssc_idle_poll_interval', 'default' => $mu_active ? 3000 : 5000, 'suffix' => __( 'ms', 'super-speedy-chat' ), 'description' => $idle_desc,
+            ) );
+            add_settings_field( 'ssc_deep_idle_poll_interval', __( 'Deep Idle Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+                'key' => 'ssc_deep_idle_poll_interval', 'default' => $mu_active ? 10000 : 15000, 'suffix' => __( 'ms', 'super-speedy-chat' ),
+                'description' => __( 'Polling after 2 minutes idle.', 'super-speedy-chat' ),
             ) );
             add_settings_field( 'ssc_play_sounds', __( 'Play Sounds', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
-                'key' => 'ssc_play_sounds', 'label' => __( 'Play sounds on new messages', 'super-speedy-chat' ), 'default' => true,
+                'key' => 'ssc_play_sounds', 'label' => __( 'Play sounds on new messages and chat open/close', 'super-speedy-chat' ), 'default' => true,
+            ) );
+            add_settings_field( 'ssc_sound_message', __( 'Message Sound', 'super-speedy-chat' ), array( $this, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
+                'key' => 'ssc_sound_message', 'default' => 'msg.mp3',
+            ) );
+            add_settings_field( 'ssc_sound_open', __( 'Open/Close Sound', 'super-speedy-chat' ), array( $this, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
+                'key' => 'ssc_sound_open', 'default' => 'woosh.mp3',
+            ) );
+            add_settings_field( 'ssc_sound_volume', __( 'Sound Volume', 'super-speedy-chat' ), array( $this, 'field_range' ), 'ssc', 'ssc_section_behaviour', array(
+                'key' => 'ssc_sound_volume', 'default' => 30, 'min' => 0, 'max' => 100, 'suffix' => '%',
             ) );
             add_settings_field( 'ssc_require_login', __( 'Require Login', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_require_login', 'label' => __( 'Require login to chat', 'super-speedy-chat' ), 'default' => false,
@@ -122,6 +161,26 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
 
             // ---- Canned Responses section ----
             add_settings_section( 'ssc_section_canned', '', array( $this, 'section_canned_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+
+            // ---- LLM section ----
+            add_settings_section( 'ssc_section_llm', '', array( $this, 'section_llm_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+
+            add_settings_field( 'ssc_llm_provider', __( 'LLM Provider', 'super-speedy-chat' ), array( $this, 'field_select' ), 'ssc', 'ssc_section_llm', array(
+                'key' => 'ssc_llm_provider', 'default' => '',
+                'options' => array( '' => __( '— Disabled —', 'super-speedy-chat' ), 'openai' => 'OpenAI', 'anthropic' => 'Anthropic' ),
+            ) );
+            add_settings_field( 'ssc_llm_api_key', __( 'API Key', 'super-speedy-chat' ), array( $this, 'field_password' ), 'ssc', 'ssc_section_llm', array(
+                'key' => 'ssc_llm_api_key', 'default' => '', 'description' => __( 'Your API key. Stored in the database — use a key with minimal permissions.', 'super-speedy-chat' ),
+            ) );
+            add_settings_field( 'ssc_llm_model', __( 'Model', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_llm', array(
+                'key' => 'ssc_llm_model', 'default' => '',
+                'description' => __( 'Leave blank for default (gpt-4o-mini / claude-haiku-4-5). Use the cheapest model — this is just a classifier.', 'super-speedy-chat' ),
+            ) );
+            add_settings_field( 'ssc_llm_system_prompt', __( 'System Prompt', 'super-speedy-chat' ), array( $this, 'field_textarea' ), 'ssc', 'ssc_section_llm', array(
+                'key' => 'ssc_llm_system_prompt',
+                'default' => 'You are a classifier for a live chat support system. Given a visitor\'s question and a list of canned responses, pick the best matching canned response number. If none are a good match, respond with 0. Respond with ONLY the number, nothing else.',
+                'description' => __( 'Instructions for the LLM classifier. The default works well — only change if needed.', 'super-speedy-chat' ),
+            ) );
 
             // ---- Discord section ----
             add_settings_section( 'ssc_section_discord', '', array( $this, 'section_discord_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
@@ -174,6 +233,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 'behaviour'     => __( 'Behaviour', 'super-speedy-chat' ),
                 'email'         => __( 'Email', 'super-speedy-chat' ),
                 'canned'        => __( 'Canned Responses', 'super-speedy-chat' ),
+                'llm'           => __( 'LLM Auto-Reply', 'super-speedy-chat' ),
                 'discord'       => __( 'Discord', 'super-speedy-chat' ),
                 'status'        => __( 'Status', 'super-speedy-chat' ),
             );
@@ -246,6 +306,13 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                         <button class="button ssc-filter-btn" data-status="waiting"><?php esc_html_e( 'Waiting', 'super-speedy-chat' ); ?></button>
                         <button class="button ssc-filter-btn" data-status="closed"><?php esc_html_e( 'Closed', 'super-speedy-chat' ); ?></button>
                     </div>
+                    <div class="ssc-assign-filter">
+                        <select id="ssc-filter-assigned">
+                            <option value=""><?php esc_html_e( 'All Assignees', 'super-speedy-chat' ); ?></option>
+                            <option value="unassigned"><?php esc_html_e( 'Unassigned', 'super-speedy-chat' ); ?></option>
+                            <option value="mine"><?php esc_html_e( 'Assigned to Me', 'super-speedy-chat' ); ?></option>
+                        </select>
+                    </div>
                     <div class="ssc-search-box">
                         <input type="search" id="ssc-search-input" placeholder="<?php esc_attr_e( 'Search visitor name or email...', 'super-speedy-chat' ); ?>" />
                     </div>
@@ -259,11 +326,12 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                             <th class="ssc-col-status"><?php esc_html_e( 'Status', 'super-speedy-chat' ); ?></th>
                             <th class="ssc-col-started"><?php esc_html_e( 'Started', 'super-speedy-chat' ); ?></th>
                             <th class="ssc-col-activity"><?php esc_html_e( 'Last Activity', 'super-speedy-chat' ); ?></th>
+                            <th class="ssc-col-assigned"><?php esc_html_e( 'Assigned', 'super-speedy-chat' ); ?></th>
                             <th class="ssc-col-actions"><?php esc_html_e( 'Actions', 'super-speedy-chat' ); ?></th>
                         </tr>
                     </thead>
                     <tbody id="ssc-conversations-tbody">
-                        <tr class="ssc-loading-row"><td colspan="6"><?php esc_html_e( 'Loading conversations...', 'super-speedy-chat' ); ?></td></tr>
+                        <tr class="ssc-loading-row"><td colspan="7"><?php esc_html_e( 'Loading conversations...', 'super-speedy-chat' ); ?></td></tr>
                     </tbody>
                 </table>
 
@@ -301,6 +369,12 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                             <dt><?php esc_html_e( 'User Agent', 'super-speedy-chat' ); ?></dt><dd id="ssc-info-useragent">&mdash;</dd>
                             <dt><?php esc_html_e( 'Page URL', 'super-speedy-chat' ); ?></dt><dd id="ssc-info-page-url">&mdash;</dd>
                             <dt><?php esc_html_e( 'Started At', 'super-speedy-chat' ); ?></dt><dd id="ssc-info-started">&mdash;</dd>
+                            <dt><?php esc_html_e( 'Assigned To', 'super-speedy-chat' ); ?></dt>
+                            <dd>
+                                <select id="ssc-assign-select">
+                                    <option value="0"><?php esc_html_e( 'Unassigned', 'super-speedy-chat' ); ?></option>
+                                </select>
+                            </dd>
                         </dl>
                     </div>
                     <div class="ssc-detail-main">
@@ -390,6 +464,45 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             if ( $description ) {
                 echo '<p class="description">' . esc_html( $description ) . '</p>';
             }
+        }
+
+        public function field_sound_select( $args ) {
+            $key     = $args['key'];
+            $default = isset( $args['default'] ) ? $args['default'] : 'msg.mp3';
+            $value   = SSC_Settings::get_option( $key, $default );
+
+            $sounds_dir = SSC_DIR . 'assets/sounds/';
+            $sound_files = array();
+            if ( is_dir( $sounds_dir ) ) {
+                foreach ( glob( $sounds_dir . '*.mp3' ) as $file ) {
+                    $filename = basename( $file );
+                    $label = str_replace( array( '.mp3', '-', '_' ), array( '', ' ', ' ' ), $filename );
+                    $sound_files[ $filename ] = ucwords( $label );
+                }
+            }
+
+            $sounds_url = SSC_URL . 'assets/sounds/';
+            printf( '<select name="ssc_options[%s]" class="ssc-sound-select" data-sounds-url="%s">', esc_attr( $key ), esc_url( $sounds_url ) );
+            foreach ( $sound_files as $file => $label ) {
+                printf( '<option value="%s" %s>%s</option>', esc_attr( $file ), selected( $value, $file, false ), esc_html( $label ) );
+            }
+            echo '</select>';
+            printf( ' <button type="button" class="button button-small ssc-preview-sound" data-select="%s">&#9654; Preview</button>', esc_attr( $key ) );
+        }
+
+        public function field_range( $args ) {
+            $key     = $args['key'];
+            $default = isset( $args['default'] ) ? $args['default'] : 50;
+            $min     = isset( $args['min'] ) ? $args['min'] : 0;
+            $max     = isset( $args['max'] ) ? $args['max'] : 100;
+            $suffix  = isset( $args['suffix'] ) ? $args['suffix'] : '';
+            $value   = SSC_Settings::get_option( $key, $default );
+
+            printf(
+                '<input type="range" name="ssc_options[%s]" value="%s" min="%d" max="%d" class="ssc-range-slider" id="%s" />',
+                esc_attr( $key ), esc_attr( $value ), $min, $max, esc_attr( $key )
+            );
+            printf( ' <span class="ssc-range-value">%s%s</span>', esc_html( $value ), esc_html( $suffix ) );
         }
 
         public function field_select( $args ) {
@@ -486,6 +599,34 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                         <tr><td colspan="5" class="ssc-loading-row"><?php esc_html_e( 'Loading...', 'super-speedy-chat' ); ?></td></tr>
                     </tbody>
                 </table>
+            </div>
+            <?php
+        }
+
+        // ---- LLM section callback ----
+
+        public function section_llm_callback() {
+            ?>
+            <div class="ssc-guide-box">
+                <h3><?php esc_html_e( 'LLM Auto-Reply — Canned Response Classifier', 'super-speedy-chat' ); ?></h3>
+                <p><?php esc_html_e( 'When no admin replies within the timeout period, the LLM classifier matches the visitor\'s question against your canned responses and auto-replies with the best match. Uses a cheap, fast model — costs fractions of a cent per classification.', 'super-speedy-chat' ); ?></p>
+
+                <h4 style="margin-top:16px;"><?php esc_html_e( 'How it works', 'super-speedy-chat' ); ?></h4>
+                <ol>
+                    <li><?php esc_html_e( 'Visitor asks a question and no admin replies within the timeout period.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'The visitor\'s question is sent to the LLM along with all your canned responses.', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'The LLM picks the best matching canned response (or determines no match exists).', 'super-speedy-chat' ); ?></li>
+                    <li><?php esc_html_e( 'If a match is found, the canned response is sent as an auto-reply to the visitor.', 'super-speedy-chat' ); ?></li>
+                </ol>
+
+                <h4 style="margin-top:16px;"><?php esc_html_e( 'Setup', 'super-speedy-chat' ); ?></h4>
+                <ol>
+                    <li><?php esc_html_e( 'Choose a provider (OpenAI or Anthropic) and enter your API key below.', 'super-speedy-chat' ); ?></li>
+                    <li><?php printf( esc_html__( 'Go to the %sBehaviour%s tab and set Timeout Action to "Auto-reply with canned response (LLM)".', 'super-speedy-chat' ), '<strong>', '</strong>' ); ?></li>
+                    <li><?php printf( esc_html__( 'Make sure you have canned responses saved in the %sCanned Responses%s tab.', 'super-speedy-chat' ), '<strong>', '</strong>' ); ?></li>
+                </ol>
+
+                <p class="description"><?php esc_html_e( 'Tip: The default model (gpt-4o-mini / claude-haiku-4-5) is recommended — it\'s cheap and fast. This is a simple classifier, not a conversational AI.', 'super-speedy-chat' ); ?></p>
             </div>
             <?php
         }
@@ -612,27 +753,37 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             // Text.
-            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_discord_bot_token', 'ssc_discord_channel_id' );
+            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_discord_bot_token', 'ssc_discord_channel_id', 'ssc_llm_api_key', 'ssc_llm_model' );
             foreach ( $text_keys as $k ) {
                 $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_text_field( $input[ $k ] ) : '';
             }
 
             // Textarea.
-            if ( isset( $input['ssc_welcome_message'] ) ) {
-                $sanitized['ssc_welcome_message'] = sanitize_textarea_field( $input['ssc_welcome_message'] );
+            $textarea_keys = array( 'ssc_welcome_message', 'ssc_llm_system_prompt' );
+            foreach ( $textarea_keys as $k ) {
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = sanitize_textarea_field( $input[ $k ] );
+                }
             }
 
             // Select.
             $select_allowed = array(
-                'ssc_timeout_action'      => array( 'show_email_prompt', 'do_nothing' ),
+                'ssc_timeout_action'      => array( 'show_email_prompt', 'llm_canned_response', 'llm_then_email', 'do_nothing' ),
                 'ssc_display_name_mode'   => array( 'shared', 'individual' ),
+                'ssc_llm_provider'        => array( '', 'openai', 'anthropic' ),
             );
             foreach ( $select_allowed as $k => $allowed ) {
                 $sanitized[ $k ] = ( isset( $input[ $k ] ) && in_array( $input[ $k ], $allowed, true ) ) ? $input[ $k ] : $allowed[0];
             }
 
+            // Sound selects (sanitize as filenames).
+            $sound_keys = array( 'ssc_sound_message', 'ssc_sound_open' );
+            foreach ( $sound_keys as $k ) {
+                $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_file_name( $input[ $k ] ) : '';
+            }
+
             // Numbers.
-            $num_keys = array( 'ssc_admin_timeout', 'ssc_login_prompt_after', 'ssc_max_message_length', 'ssc_poll_interval', 'ssc_idle_poll_interval' );
+            $num_keys = array( 'ssc_admin_timeout', 'ssc_login_prompt_after', 'ssc_max_message_length', 'ssc_poll_interval', 'ssc_idle_poll_interval', 'ssc_deep_idle_poll_interval', 'ssc_sound_volume' );
             foreach ( $num_keys as $k ) {
                 $sanitized[ $k ] = isset( $input[ $k ] ) ? absint( $input[ $k ] ) : 0;
             }

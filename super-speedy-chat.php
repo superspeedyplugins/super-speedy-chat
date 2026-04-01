@@ -5,7 +5,7 @@ Plugin URI: https://www.superspeedyplugins.com
 Author: Dave Hilditch (Super Speedy Plugins)
 Author URI: https://www.superspeedyplugins.com
 Text Domain: super-speedy-chat
-Version: 1.06.6
+Version: 1.07.0
 Description: The fastest live chat plugin for WordPress. Ultra-fast AJAX via mu-plugin, visitor-to-admin chat with email fallback.
 */
 
@@ -45,6 +45,7 @@ require_once SSC_DIR . 'includes/class-ssc-email.php';
 require_once SSC_DIR . 'includes/class-ssc-mu-installer.php';
 require_once SSC_DIR . 'includes/class-ssc-rest.php';
 require_once SSC_DIR . 'includes/class-ssc-canned.php';
+require_once SSC_DIR . 'includes/class-ssc-llm.php';
 require_once SSC_DIR . 'includes/class-ssc-discord.php';
 
 // Activation hook: create DB tables and install mu-plugin
@@ -116,12 +117,19 @@ function ssc_enqueue_frontend_assets() {
         true
     );
 
+    // Check if ultra-fast AJAX is active (mu-plugin installed + enabled).
+    $ultra_ajax_active = SSC_MU_Installer::is_installed() && SSC_Settings::get_option( 'ssc_mu_enabled', true );
+
     // Gather settings for the front-end.
-    $poll_interval      = SSC_Settings::get_option( 'ssc_poll_interval', 2000 );
-    $idle_poll_interval = SSC_Settings::get_option( 'ssc_idle_poll_interval', 5000 );
+    $poll_interval      = SSC_Settings::get_option( 'ssc_poll_interval', $ultra_ajax_active ? 1000 : 2000 );
+    $idle_poll_interval = SSC_Settings::get_option( 'ssc_idle_poll_interval', $ultra_ajax_active ? 3000 : 5000 );
     $max_message_length = SSC_Settings::get_option( 'ssc_max_message_length', 500 );
     $welcome_message    = SSC_Settings::get_option( 'ssc_welcome_message', __( 'Hi! How can we help you today?', 'super-speedy-chat' ) );
+    $deep_idle_interval = SSC_Settings::get_option( 'ssc_deep_idle_poll_interval', $ultra_ajax_active ? 10000 : 15000 );
     $sounds_enabled     = SSC_Settings::get_option( 'ssc_play_sounds', true );
+    $sound_message      = SSC_Settings::get_option( 'ssc_sound_message', 'msg.mp3' );
+    $sound_open         = SSC_Settings::get_option( 'ssc_sound_open', 'woosh.mp3' );
+    $sound_volume       = SSC_Settings::get_option( 'ssc_sound_volume', 30 );
     $admin_timeout      = SSC_Settings::get_option( 'ssc_admin_timeout', 30 );
     $timeout_action     = SSC_Settings::get_option( 'ssc_timeout_action', 'show_email_prompt' );
     $login_prompt_after = SSC_Settings::get_option( 'ssc_login_prompt_after', 5 );
@@ -138,11 +146,15 @@ function ssc_enqueue_frontend_assets() {
         'rest_url'           => esc_url_raw( rest_url( 'ssc/v1/' ) ),
         'nonce'              => wp_create_nonce( 'wp_rest' ),
         'poll_interval'      => absint( $poll_interval ),
-        'idle_poll_interval' => absint( $idle_poll_interval ),
-        'max_message_length' => absint( $max_message_length ),
+        'idle_poll_interval'      => absint( $idle_poll_interval ),
+        'deep_idle_poll_interval' => absint( $deep_idle_interval ),
+        'max_message_length'      => absint( $max_message_length ),
         'welcome_message'    => esc_html( $welcome_message ),
         'sounds_enabled'     => (bool) $sounds_enabled,
         'sounds_url'         => SSC_URL . 'assets/sounds/',
+        'sound_message'      => sanitize_file_name( $sound_message ),
+        'sound_open'         => sanitize_file_name( $sound_open ),
+        'sound_volume'       => absint( $sound_volume ) / 100,
         'images_url'         => SSC_URL . 'assets/images/',
         'admin_timeout'      => absint( $admin_timeout ),
         'timeout_action'     => $timeout_action,
@@ -155,6 +167,7 @@ function ssc_enqueue_frontend_assets() {
         'window_title'       => ! empty( $customizer['window_title'] ) ? esc_html( $customizer['window_title'] ) : 'Chat',
         'trigger_icon'       => ! empty( $customizer['trigger_icon'] ) ? $customizer['trigger_icon'] : 'chat',
         'trigger_icon_image' => ! empty( $customizer['trigger_icon_image'] ) ? esc_url( $customizer['trigger_icon_image'] ) : '',
+        'ultra_ajax'         => $ultra_ajax_active,
         'is_logged_in'       => is_user_logged_in(),
         'login_url'          => wp_login_url(),
         'register_url'       => wp_registration_url(),

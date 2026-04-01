@@ -13,9 +13,36 @@
         page: 1,
         status: '',
         search: '',
+        assignedTo: '',
         pollTimer: null,
-        lastMessageId: 0
+        lastMessageId: 0,
+        lastWaitingCount: -1,
+        notificationSound: null
     };
+
+    // Build admin name lookup map.
+    var adminNameMap = {};
+    if (config.admin_users) {
+        for (var i = 0; i < config.admin_users.length; i++) {
+            adminNameMap[config.admin_users[i].id] = config.admin_users[i].name;
+        }
+    }
+
+    // Preload admin notification sound.
+    if (config.sounds_enabled && config.sounds_url && config.sound_message) {
+        var audio = new Audio(config.sounds_url + config.sound_message);
+        audio.preload = 'auto';
+        audio.volume = (typeof config.sound_volume === 'number') ? config.sound_volume : 0.3;
+        state.notificationSound = audio;
+    }
+
+    function playNotificationSound() {
+        if (!state.notificationSound) return;
+        try {
+            state.notificationSound.currentTime = 0;
+            state.notificationSound.play().catch(function () {});
+        } catch (e) {}
+    }
 
     // ---------------------------------------------------------------
     // Initialization
@@ -101,6 +128,18 @@
             loadConversations();
         });
 
+        // Assigned filter
+        $('#ssc-filter-assigned').on('change', function () {
+            var val = $(this).val();
+            if (val === 'mine') {
+                state.assignedTo = config.admin_id;
+            } else {
+                state.assignedTo = val; // '' or 'unassigned'
+            }
+            state.page = 1;
+            loadConversations();
+        });
+
         // Search
         var searchTimeout;
         $('#ssc-search-input').on('input', function () {
@@ -146,13 +185,12 @@
         };
         if (state.status) params.status = state.status;
         if (state.search) params.search = state.search;
+        if (state.assignedTo) params.assigned_to = state.assignedTo;
 
         apiGet('admin/conversations', params, function (data) {
             renderConversationRows(data.items);
             updatePagination(data);
-            if (!silent) {
-                updateStats();
-            }
+            updateStats();
         });
     }
 
@@ -161,12 +199,13 @@
         tbody.empty();
 
         if (!items || items.length === 0) {
-            tbody.html('<tr class="ssc-empty-row"><td colspan="6">No conversations found.</td></tr>');
+            tbody.html('<tr class="ssc-empty-row"><td colspan="7">No conversations found.</td></tr>');
             return;
         }
 
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
+            var assignedName = item.assigned_to ? (adminNameMap[item.assigned_to] || 'Admin #' + item.assigned_to) : '—';
             var row = '<tr class="ssc-conversation-row" data-id="' + item.id + '">' +
                 '<td class="ssc-col-visitor"><strong>' + esc(item.visitor_name) + '</strong>' +
                     (item.visitor_email ? '<br><small>' + esc(item.visitor_email) + '</small>' : '') +
@@ -175,6 +214,7 @@
                 '<td class="ssc-col-status"><span class="ssc-status-badge ssc-status-' + item.status + '">' + item.status + '</span></td>' +
                 '<td class="ssc-col-started">' + formatDate(item.started_at) + '</td>' +
                 '<td class="ssc-col-activity">' + formatDate(item.last_message_at) + '</td>' +
+                '<td class="ssc-col-assigned">' + esc(assignedName) + '</td>' +
                 '<td class="ssc-col-actions"><a href="admin.php?page=ssc&conversation_id=' + item.id + '" class="button button-small">View</a></td>' +
                 '</tr>';
             tbody.append(row);
@@ -196,6 +236,10 @@
 
         apiGet('admin/conversations', { status: 'waiting', per_page: 1 }, function (data) {
             $('#ssc-stat-waiting').text(data.total);
+            if (state.lastWaitingCount >= 0 && data.total > state.lastWaitingCount) {
+                playNotificationSound();
+            }
+            state.lastWaitingCount = data.total;
         });
 
         // Total today - no direct endpoint, use total from current query
@@ -211,6 +255,23 @@
     function initConversationDetail() {
         var conversationId = config.conversation_id;
         if (!conversationId) return;
+
+        // Populate assignment dropdown with admin users.
+        var $assignSelect = $('#ssc-assign-select');
+        if ($assignSelect.length && config.admin_users) {
+            for (var i = 0; i < config.admin_users.length; i++) {
+                var au = config.admin_users[i];
+                $assignSelect.append('<option value="' + au.id + '">' + esc(au.name) + '</option>');
+            }
+        }
+
+        // Handle assignment change.
+        $assignSelect.on('change', function () {
+            var assignedTo = $(this).val();
+            apiPost('admin/assign/' + conversationId, { assigned_to: assignedTo }, function () {
+                // Assignment saved silently.
+            });
+        });
 
         loadConversation(conversationId);
 
@@ -252,6 +313,7 @@
             $('#ssc-info-useragent').text(conv.user_agent || '—');
             $('#ssc-info-page-url').text(conv.last_page_url || '—');
             $('#ssc-info-started').text(formatDate(conv.started_at));
+            $('#ssc-assign-select').val(conv.assigned_to || '0');
 
             // Render messages.
             renderMessages(data.messages);
@@ -284,10 +346,17 @@
 
     function appendMessages(messages) {
         var thread = $('#ssc-messages-thread');
+        var hadVisitorMsg = false;
         for (var i = 0; i < messages.length; i++) {
             if (parseInt(messages[i].id, 10) > state.lastMessageId) {
                 appendSingleMessage(messages[i], thread);
+                if (messages[i].participant_type === 'visitor') {
+                    hadVisitorMsg = true;
+                }
             }
+        }
+        if (hadVisitorMsg) {
+            playNotificationSound();
         }
         scrollThreadToBottom();
     }
@@ -673,5 +742,28 @@
         var mins = d.getMinutes();
         return day + '/' + month + ' ' + (hours < 10 ? '0' : '') + hours + ':' + (mins < 10 ? '0' : '') + mins;
     }
+
+    // ---------------------------------------------------------------
+    // Sound Preview & Range Slider
+    // ---------------------------------------------------------------
+
+    $(document).on('click', '.ssc-preview-sound', function () {
+        var selectKey = $(this).data('select');
+        var $select = $('select[name="ssc_options[' + selectKey + ']"]');
+        var soundsUrl = $select.data('sounds-url');
+        var file = $select.val();
+        var $volumeSlider = $('#ssc_sound_volume');
+        var volume = $volumeSlider.length ? $volumeSlider.val() / 100 : 0.3;
+
+        if (file && soundsUrl) {
+            var audio = new Audio(soundsUrl + file);
+            audio.volume = volume;
+            audio.play().catch(function () {});
+        }
+    });
+
+    $(document).on('input', '.ssc-range-slider', function () {
+        $(this).next('.ssc-range-value').text($(this).val() + '%');
+    });
 
 })(jQuery);

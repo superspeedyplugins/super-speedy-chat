@@ -156,6 +156,56 @@ if ( ! class_exists( 'SSC_Chat' ) ) {
         }
 
         /**
+         * Send a bot/auto-reply message to a conversation.
+         *
+         * @param int    $conversation_id Conversation ID.
+         * @param string $message         Message text.
+         * @param string $message_type    Message type (default 'auto_reply').
+         * @return array|WP_Error
+         */
+        public static function send_bot_message( $conversation_id, $message, $message_type = 'auto_reply' ) {
+            $message = sanitize_text_field( $message );
+            if ( empty( $message ) ) {
+                return new WP_Error( 'empty_message', __( 'Message cannot be empty.', 'super-speedy-chat' ), array( 'status' => 400 ) );
+            }
+
+            $conversation = SSC_DB::get_conversation( $conversation_id );
+            if ( ! $conversation ) {
+                return new WP_Error( 'not_found', __( 'Conversation not found.', 'super-speedy-chat' ), array( 'status' => 404 ) );
+            }
+
+            // Get or create bot participant.
+            $participant = SSC_DB::get_participant_by_type( $conversation_id, 'bot' );
+            if ( ! $participant ) {
+                $bot_name = SSC_Settings::get_option( 'ssc_shared_display_name', get_bloginfo( 'name' ) );
+
+                $participant_id = SSC_DB::add_participant( array(
+                    'conversation_id'  => $conversation_id,
+                    'participant_type' => 'bot',
+                    'display_name'     => $bot_name,
+                ) );
+
+                $participant = (object) array( 'id' => $participant_id );
+            }
+
+            $message_id = SSC_DB::add_message( array(
+                'conversation_id' => $conversation_id,
+                'participant_id'  => $participant->id,
+                'message'         => $message,
+                'message_type'    => $message_type,
+            ) );
+
+            if ( ! $message_id ) {
+                return new WP_Error( 'message_error', __( 'Could not save message.', 'super-speedy-chat' ), array( 'status' => 500 ) );
+            }
+
+            return array(
+                'message_id'      => $message_id,
+                'conversation_id' => $conversation_id,
+            );
+        }
+
+        /**
          * Poll for new messages in a conversation.
          *
          * @param int $conversation_id Conversation ID.
