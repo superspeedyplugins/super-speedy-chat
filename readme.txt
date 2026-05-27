@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.07
+Stable tag: 1.07.1
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,10 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.08 (20th May 2026) =
+* Updated the Super Speedy Settings page: added a "Recheck Licenses" button above the licence table so customers have a clear way to refresh licence status after a renewal or upgrade without scrolling down to the licence-key field. The button is disabled until a licence key is entered/saved and re-enables as you type.
+* The Recheck flow now also force-bypasses the auth-server's own 1-hour licence cache (via a `force=1` flag on the `wpiapi/check_product_key` call), so renewals/upgrades that completed less than an hour before a recheck no longer show as expired/exceeded. Normal admin page loads continue to use both caches as before — only an explicit Recheck click bypasses them. (Lives in the `super-speedy-settings` submodule, so the change propagates to every Super Speedy plugin.)
 
 = 1.07 (1st April 2026) =
 * Added LLM auto-reply system — classifies visitor questions against canned responses using OpenAI or Anthropic and auto-sends the best match when admins are away
