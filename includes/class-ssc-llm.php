@@ -8,12 +8,49 @@ if ( ! class_exists( 'SSC_LLM' ) ) {
     class SSC_LLM {
 
         /**
+         * Default site-wide ceiling on paid LLM classification calls per day.
+         *
+         * The auto-reply endpoint is unauthenticated, so per-IP rate limiting
+         * alone doesn't bound the bill an attacker (rotating IPs) can run up.
+         * This is a hard global backstop. Override with the `ssc_llm_daily_cap`
+         * filter; return 0 (or less) to disable the cap entirely.
+         */
+        const DAILY_CALL_CAP = 200;
+
+        /**
          * Check if LLM auto-reply is configured and enabled.
          */
         public static function is_enabled() {
             $api_key  = SSC_Settings::get_option( 'ssc_llm_api_key', '' );
             $provider = SSC_Settings::get_option( 'ssc_llm_provider', '' );
             return ! empty( $api_key ) && ! empty( $provider );
+        }
+
+        /**
+         * Transient key for today's global call counter (UTC day).
+         */
+        private static function daily_counter_key() {
+            return 'ssc_llm_calls_' . gmdate( 'Ymd' );
+        }
+
+        /**
+         * Whether the site-wide daily classification cap has been reached.
+         */
+        private static function daily_cap_reached() {
+            $cap = (int) apply_filters( 'ssc_llm_daily_cap', self::DAILY_CALL_CAP );
+            if ( $cap <= 0 ) {
+                return false; // Cap disabled.
+            }
+            return (int) get_transient( self::daily_counter_key() ) >= $cap;
+        }
+
+        /**
+         * Record that a paid LLM call was made (increments today's counter).
+         */
+        private static function record_call() {
+            $key   = self::daily_counter_key();
+            $count = (int) get_transient( $key );
+            set_transient( $key, $count + 1, DAY_IN_SECONDS );
         }
 
         /**
@@ -26,6 +63,13 @@ if ( ! class_exists( 'SSC_LLM' ) ) {
          */
         public static function classify_question( $visitor_question ) {
             if ( ! self::is_enabled() ) {
+                return null;
+            }
+
+            // Global daily backstop against cost abuse on the unauthenticated
+            // auto-reply endpoint.
+            if ( self::daily_cap_reached() ) {
+                error_log( 'SSC LLM: daily classification cap reached; skipping LLM call.' );
                 return null;
             }
 
@@ -60,6 +104,9 @@ if ( ! class_exists( 'SSC_LLM' ) ) {
             $provider = SSC_Settings::get_option( 'ssc_llm_provider', 'openai' );
             $api_key  = SSC_Settings::get_option( 'ssc_llm_api_key', '' );
             $model    = SSC_Settings::get_option( 'ssc_llm_model', '' );
+
+            // Count the call against today's budget before dispatching it.
+            self::record_call();
 
             $response_text = self::call_llm( $provider, $api_key, $model, $system_prompt, $user_prompt );
 

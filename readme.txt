@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.07.1
+Stable tag: 1.08
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -36,7 +36,21 @@ Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
 
-= 1.08 (20th May 2026) =
+= 1.08 (27th May 2026) =
+* Introduced the add-on extension API (`SSC_ADDON_API_VERSION = 1.0`) — channel integrations can now ship as separate plugins (WhatsApp, Slack, Telegram, etc.) and plug into core via hooks instead of patching it
+* Added `SSC_Addons` registry class — add-ons call `SSC_Addons::register()` to declare slug, version, channel, and minimum API version requirements
+* Added PHP message-lifecycle hooks: `ssc_visitor_message_sent`, `ssc_admin_reply_sent`, `ssc_bot_message_sent`, `ssc_conversation_created`, `ssc_conversation_status_changed`
+* Added `ssc_channels` filter for channel registry, `ssc_settings_tabs` + `ssc_register_settings` + `ssc_sanitize_options` for shared settings, `ssc_register_rest_routes` for REST extension, `ssc_conversation_sidebar` + `ssc_conversation_reply_footer` for admin UI panels, `ssc_frontend_config` + `ssc_enqueue_frontend` for bubble extension
+* Added `SSC_Chat::external_inbound()` and `SSC_Chat::get_or_create_external_conversation()` public helpers so channel add-ons can route inbound messages into core without duplicating participant/message logic
+* Added `channel` column to `ssc_conversations` (default `'website'`) with one-shot backfill from `ssc_discord_threads`
+* Added front-end JS hook system at `window.ssc.hooks` (inline ~40-line lib, matches `wp.hooks` API surface) firing `ssc.bubble.opened/closed/rendered/messageSent/messageReceived` and a `ssc.bubble.welcomeMessage` filter
+* Added admin JS hook events `ssc.admin.conversationsLoaded` and `ssc.admin.conversationRowRendered` via `wp.hooks` (admin.js now declares wp-hooks as a dependency)
+* Refactored Discord integration to use the new extension API — moved tab/section/fields registration, REST routes, message-lifecycle listeners, and admin renderers from core classes into `class-ssc-discord.php`. Discord is now the reference implementation of the add-on API while remaining bundled with core.
+* Converted `SSC_Admin::field_*` and `section_*` settings renderers to static so add-ons can reuse them
+* Database schema bumped to v4.0.0
+* Note: hook signatures may change without deprecation notices until the first commercial add-on ships. Once that happens the documented relaxed-deprecation policy applies (deprecations stay live for at least two minor versions).
+
+= 1.07.1 (20th May 2026) =
 * Updated the Super Speedy Settings page: added a "Recheck Licenses" button above the licence table so customers have a clear way to refresh licence status after a renewal or upgrade without scrolling down to the licence-key field. The button is disabled until a licence key is entered/saved and re-enables as you type.
 * The Recheck flow now also force-bypasses the auth-server's own 1-hour licence cache (via a `force=1` flag on the `wpiapi/check_product_key` call), so renewals/upgrades that completed less than an hour before a recheck no longer show as expired/exceeded. Normal admin page loads continue to use both caches as before — only an explicit Recheck click bypasses them. (Lives in the `super-speedy-settings` submodule, so the change propagates to every Super Speedy plugin.)
 

@@ -191,6 +191,9 @@
             renderConversationRows(data.items);
             updatePagination(data);
             updateStats();
+            if (window.wp && wp.hooks) {
+                wp.hooks.doAction('ssc.admin.conversationsLoaded', data.items, data);
+            }
         });
     }
 
@@ -217,7 +220,11 @@
                 '<td class="ssc-col-assigned">' + esc(assignedName) + '</td>' +
                 '<td class="ssc-col-actions"><a href="admin.php?page=ssc&conversation_id=' + item.id + '" class="button button-small">View</a></td>' +
                 '</tr>';
-            tbody.append(row);
+            var $row = $(row);
+            tbody.append($row);
+            if (window.wp && wp.hooks) {
+                wp.hooks.doAction('ssc.admin.conversationRowRendered', $row, item);
+            }
         }
     }
 

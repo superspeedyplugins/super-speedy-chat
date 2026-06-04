@@ -21,16 +21,22 @@ if ( ! class_exists( 'SSC_Session' ) ) {
             $hash = bin2hex( random_bytes( 32 ) );
 
             $expire = time() + ( self::COOKIE_DAYS * DAY_IN_SECONDS );
-            $secure = is_ssl();
 
+            // SameSite=Lax makes cross-site behaviour deterministic (and blocks the
+            // cookie on cross-site POSTs); HttpOnly keeps it out of JS. The visitor
+            // endpoints are intentionally public, so the cookie scoping is the main
+            // CSRF control here.
             setcookie(
                 self::COOKIE_NAME,
                 $hash,
-                $expire,
-                '/',
-                '',
-                $secure,
-                true
+                array(
+                    'expires'  => $expire,
+                    'path'     => '/',
+                    'domain'   => '',
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                )
             );
 
             // Make available for the current request.

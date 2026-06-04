@@ -84,7 +84,10 @@ header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 
 // Rate limiting for send and session endpoints.
 if ( in_array( $ssc_command, array( 'send', 'session', 'auto-reply' ), true ) ) {
-    $ssc_rate_key  = 'ssc_rate_' . md5( isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : 'unknown' );
+    // Key the counter per-action so each command has its own budget — mirrors
+    // SSC_REST::check_rate_limit(). A shared key would let cheap `send`s exhaust
+    // the budget that should gate the expensive `auto-reply`, and vice-versa.
+    $ssc_rate_key  = 'ssc_rate_' . $ssc_command . '_' . md5( isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : 'unknown' );
     $ssc_rate_data = get_transient( $ssc_rate_key );
 
     if ( $ssc_rate_data === false ) {

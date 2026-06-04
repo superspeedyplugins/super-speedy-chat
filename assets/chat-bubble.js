@@ -2,6 +2,36 @@
  * Super Speedy Chat - Front-end Chat Bubble
  * Vanilla JS, no jQuery dependency.
  */
+
+// Lightweight hooks library — exposed as window.ssc.hooks so channel add-ons can
+// observe and modify bubble behaviour. Mirrors the @wordpress/hooks API surface
+// (addAction/doAction/addFilter/applyFilters) without the wp-hooks dependency,
+// keeping the front-end bundle small. See .docs/addons-system-plan.md §4.4.
+(function () {
+    if (typeof window === 'undefined') return;
+    window.ssc = window.ssc || {};
+    if (window.ssc.hooks) return;
+    var actions = {}, filters = {};
+    function add(store, name, ns, cb, pri) {
+        store[name] = store[name] || [];
+        store[name].push({ ns: ns, cb: cb, pri: pri || 10 });
+        store[name].sort(function (a, b) { return a.pri - b.pri; });
+    }
+    window.ssc.hooks = {
+        addAction:    function (n, ns, cb, p) { add(actions, n, ns, cb, p); },
+        addFilter:    function (n, ns, cb, p) { add(filters, n, ns, cb, p); },
+        doAction:     function (n /*, ...args */) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            (actions[n] || []).forEach(function (h) { try { h.cb.apply(null, args); } catch (e) { /* swallow */ } });
+        },
+        applyFilters: function (n, value /*, ...args */) {
+            var args = Array.prototype.slice.call(arguments, 2);
+            (filters[n] || []).forEach(function (h) { try { value = h.cb.apply(null, [value].concat(args)); } catch (e) { /* swallow */ } });
+            return value;
+        }
+    };
+})();
+
 (function () {
     'use strict';
 
@@ -232,6 +262,8 @@
         setTimeout(function () {
             document.getElementById('ssc-input').focus();
         }, 300);
+
+        window.ssc.hooks.doAction('ssc.bubble.opened', state);
     }
 
     function closeChat() {
@@ -256,6 +288,8 @@
             widget.classList.remove('ssc-visible');
             widget.classList.remove('ssc-hiding');
         }, 300);
+
+        window.ssc.hooks.doAction('ssc.bubble.closed', state);
     }
 
     // ---------------------------------------------------------------
@@ -271,9 +305,10 @@
             var messagesEl = document.getElementById('ssc-messages');
             messagesEl.innerHTML = '<div class="ssc-scroll-anchor"></div>';
 
-            // Show welcome message.
-            if (config.welcome_message) {
-                appendSystemMessage(config.welcome_message, 'ssc-welcome');
+            // Show welcome message — allow add-ons to override it.
+            var welcome = window.ssc.hooks.applyFilters('ssc.bubble.welcomeMessage', config.welcome_message || '');
+            if (welcome) {
+                appendSystemMessage(welcome, 'ssc-welcome');
             }
 
             // Render existing messages.
@@ -325,6 +360,8 @@
 
             // Immediately poll to get the message back.
             pollMessages();
+
+            window.ssc.hooks.doAction('ssc.bubble.messageSent', text, data);
         }, function () {
             btn.disabled = false;
         });
@@ -420,11 +457,13 @@
         apiRequest('GET', 'poll?since_id=' + state.lastMessageId, null, function (data) {
             if (data.messages && data.messages.length > 0) {
                 var hadNew = false;
+                var newMessages = [];
                 for (var i = 0; i < data.messages.length; i++) {
                     var msg = data.messages[i];
                     if (parseInt(msg.id, 10) > state.lastMessageId) {
                         appendMessage(msg, true);
                         hadNew = true;
+                        newMessages.push(msg);
 
                         // If admin replied, clear timeout state.
                         if (msg.participant_type === 'admin' || msg.participant_type === 'bot') {
@@ -449,6 +488,7 @@
                     state.currentInterval = state.pollInterval;
                     state.isIdle = false;
                     state.isDeepIdle = false;
+                    window.ssc.hooks.doAction('ssc.bubble.messageReceived', newMessages);
                 }
             }
 
@@ -697,10 +737,15 @@
     // Initialize
     // ---------------------------------------------------------------
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', createWidget);
-    } else {
+    function init() {
         createWidget();
+        window.ssc.hooks.doAction('ssc.bubble.rendered');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 
 })();

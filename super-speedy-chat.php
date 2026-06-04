@@ -46,6 +46,7 @@ require_once SSC_DIR . 'includes/class-ssc-mu-installer.php';
 require_once SSC_DIR . 'includes/class-ssc-rest.php';
 require_once SSC_DIR . 'includes/class-ssc-canned.php';
 require_once SSC_DIR . 'includes/class-ssc-llm.php';
+require_once SSC_DIR . 'includes/class-ssc-addons.php';
 require_once SSC_DIR . 'includes/class-ssc-discord.php';
 
 // Activation hook: create DB tables and install mu-plugin
@@ -142,7 +143,7 @@ function ssc_enqueue_frontend_assets() {
         $customizer = array();
     }
 
-    wp_localize_script( 'ssc-chat-bubble', 'ssc_config', array(
+    $config = array(
         'rest_url'           => esc_url_raw( rest_url( 'ssc/v1/' ) ),
         'nonce'              => wp_create_nonce( 'wp_rest' ),
         'poll_interval'      => absint( $poll_interval ),
@@ -171,7 +172,19 @@ function ssc_enqueue_frontend_assets() {
         'is_logged_in'       => is_user_logged_in(),
         'login_url'          => wp_login_url(),
         'register_url'       => wp_registration_url(),
-    ) );
+    );
+
+    /**
+     * Let channel add-ons append their own keys to the front-end config blob.
+     */
+    $config = apply_filters( 'ssc_frontend_config', $config );
+
+    wp_localize_script( 'ssc-chat-bubble', 'ssc_config', $config );
+
+    /**
+     * Let channel add-ons enqueue their own bubble JS, in order, after core's bubble script.
+     */
+    do_action( 'ssc_enqueue_frontend', $ultra_ajax_active );
 }
 
 // Admin assets are enqueued by SSC_Admin::enqueue_scripts() which hooks into

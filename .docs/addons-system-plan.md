@@ -24,13 +24,20 @@ Make Super Speedy Chat **extensible by separate plugins**, so we can sell the co
 
 ## 2. Commercial model
 
-| Plugin | Channel | Bundle | Licence |
+| Plugin slug | Channel | Bundle | Licence |
 |---|---|---|---|
 | `super-speedy-chat` | Website bubble + Discord | Core (paid base plugin) | Existing super-speedy-settings licence |
-| `super-speedy-chat-whatsapp` | WhatsApp | Add-on | Own licence, same auth server |
-| `super-speedy-chat-slack` | Slack | Add-on | Own |
-| `super-speedy-chat-telegram` | Telegram | Add-on | Own |
-| `super-speedy-chat-teams` | Microsoft Teams | Add-on | Own |
+| `ssc-addon-whatsapp` | WhatsApp | Add-on | Own licence, same auth server |
+| `ssc-addon-slack` | Slack | Add-on | Own |
+| `ssc-addon-telegram` | Telegram | Add-on | Own |
+| `ssc-addon-teams` | Microsoft Teams | Add-on | Own |
+
+Naming convention (matches the existing `ssf-addon-x` family):
+- Plugin slug: `ssc-addon-{channel}` (e.g. `ssc-addon-whatsapp`)
+- PHP class prefix: `SSC_Addon_Whatsapp_*`
+- PHP function / option prefix: `ssc_addon_whatsapp_*`
+
+Distribution is naming-agnostic: each add-on is sellable standalone, as part of an SSC + add-ons bundle, or as part of a broader Super Speedy bundle with non-chat plugins. The code never needs to know which bundle it was purchased in — the licence server tells it.
 
 Each add-on is a normal WordPress plugin with `Requires Plugins: super-speedy-chat` in its header (WP 6.5+ feature — auto-deactivates the add-on if core is missing). It initialises its own `SuperSpeedySettings_1_0::init()` block, so existing licensing infrastructure just works — no core change needed for billing.
 
@@ -420,12 +427,12 @@ Below is the minimum boilerplate an add-on needs. Aimed at a developer who alrea
 ### 11.1 File layout
 
 ```
-super-speedy-chat-helloworld/
-├── super-speedy-chat-helloworld.php   # Plugin header + bootstrap
+ssc-addon-helloworld/
+├── ssc-addon-helloworld.php           # Plugin header + bootstrap
 ├── includes/
-│   ├── class-sschw-channel.php        # API client (push outbound, handle inbound)
-│   ├── class-sschw-settings.php       # Register tab + fields
-│   └── class-sschw-rest.php           # /helloworld/incoming endpoint
+│   ├── class-ssc-addon-helloworld-channel.php   # API client (push out, handle in)
+│   ├── class-ssc-addon-helloworld-settings.php  # Register tab + fields
+│   └── class-ssc-addon-helloworld-rest.php      # /helloworld/incoming endpoint
 ├── assets/
 │   ├── admin.js                       # Adds column + badge to list
 │   └── bubble.js                      # Adds button to front-end bubble
@@ -438,7 +445,7 @@ super-speedy-chat-helloworld/
 ```php
 <?php
 /*
-Plugin Name: Super Speedy Chat — Hello World
+Plugin Name: SSC Add-on — Hello World
 Plugin URI: https://www.superspeedyplugins.com
 Author: Super Speedy Plugins
 Version: 1.0.0
@@ -451,14 +458,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 add_action( 'plugins_loaded', function() {
     if ( ! class_exists( 'SSC_Chat' ) ) {
         add_action( 'admin_notices', function() {
-            echo '<div class="notice notice-error"><p>Super Speedy Chat — Hello World requires Super Speedy Chat to be active.</p></div>';
+            echo '<div class="notice notice-error"><p>SSC Add-on — Hello World requires Super Speedy Chat to be active.</p></div>';
         });
         return;
     }
 
     // Register with the add-on system
     SSC_Addons::register( array(
-        'slug'    => 'super-speedy-chat-helloworld',
+        'slug'    => 'ssc-addon-helloworld',
         'name'    => 'Hello World',
         'version' => '1.0.0',
         'channel' => 'helloworld',
@@ -469,22 +476,22 @@ add_action( 'plugins_loaded', function() {
     // Init the licensing submodule
     require_once __DIR__ . '/super-speedy-settings/super-speedy-settings.php';
     SuperSpeedySettings_1_0::init( array(
-        'plugin_slug' => 'super-speedy-chat-helloworld',
+        'plugin_slug' => 'ssc-addon-helloworld',
         'version'     => '1.0.0',
         'file'        => __FILE__,
     ) );
 
     // Wire the channel
-    require_once __DIR__ . '/includes/class-sschw-channel.php';
-    SSCHW_Channel::init();
+    require_once __DIR__ . '/includes/class-ssc-addon-helloworld-channel.php';
+    SSC_Addon_HelloWorld_Channel::init();
 }, 20 ); // priority 20 to ensure core has set up its constants
 ```
 
 ### 11.3 Pushing outbound messages
 
 ```php
-// In class-sschw-channel.php
-class SSCHW_Channel {
+// In class-ssc-addon-helloworld-channel.php
+class SSC_Addon_HelloWorld_Channel {
     public static function init() {
         add_action( 'ssc_visitor_message_sent', array( __CLASS__, 'on_visitor' ), 10, 4 );
         add_action( 'ssc_admin_reply_sent',     array( __CLASS__, 'on_admin' ),   10, 4 );
@@ -498,8 +505,8 @@ class SSCHW_Channel {
 
     public static function on_visitor( $message_id, $conversation, $message_text, $participant ) {
         // Only push if our channel is enabled and this conversation is on our channel
-        if ( ! get_option( 'sschw_enabled' ) ) return;
-        if ( $conversation->channel !== 'helloworld' && ! self::is_mirroring() ) return;
+        if ( ! get_option( 'ssc_addon_helloworld_enabled' ) ) return;
+        if ( $conversation->channel !== 'helloworld' ) return;
 
         self::send_to_external_api( $conversation, $participant->display_name, $message_text );
     }
@@ -515,7 +522,7 @@ class SSCHW_Channel {
                 'from' => $sender,
                 'text' => $body,
             ) ),
-            'headers' => array( 'Authorization' => 'Bearer ' . get_option( 'sschw_token' ) ),
+            'headers' => array( 'Authorization' => 'Bearer ' . get_option( 'ssc_addon_helloworld_token' ) ),
             'timeout' => 10,
         ) );
     }
@@ -528,15 +535,15 @@ class SSCHW_Channel {
 add_action( 'ssc_register_rest_routes', function( $rest ) {
     register_rest_route( 'ssc/v1', '/helloworld/incoming', array(
         'methods'  => 'POST',
-        'callback' => 'sschw_handle_incoming',
+        'callback' => 'ssc_addon_helloworld_handle_incoming',
         'permission_callback' => function( $request ) {
-            $secret = $request->get_header( 'X-SSCHW-Secret' );
-            return hash_equals( get_option( 'sschw_webhook_secret' ), $secret );
+            $secret = $request->get_header( 'X-SSC-Addon-Secret' );
+            return hash_equals( get_option( 'ssc_addon_helloworld_webhook_secret' ), $secret );
         },
     ) );
 } );
 
-function sschw_handle_incoming( $request ) {
+function ssc_addon_helloworld_handle_incoming( $request ) {
     $conv = SSC_Chat::get_or_create_external_conversation( array(
         'channel'      => 'helloworld',
         'external_id'  => $request->get_param( 'user_id' ),
@@ -561,26 +568,26 @@ function sschw_handle_incoming( $request ) {
 ```php
 add_filter( 'ssc_settings_tabs', function( $tabs ) {
     $tabs['helloworld'] = array(
-        'label' => __( 'Hello World', 'sschw' ),
-        'order' => 90,
-        'section' => 'sschw_section',
+        'label'   => __( 'Hello World', 'ssc-addon-helloworld' ),
+        'order'   => 90,
+        'section' => 'ssc_addon_helloworld_section',
     );
     return $tabs;
 } );
 
 add_action( 'ssc_register_settings', function() {
-    add_settings_section( 'sschw_section', '', '__return_null', 'ssc', array(
+    add_settings_section( 'ssc_addon_helloworld_section', '', '__return_null', 'ssc', array(
         'before_section' => '<div class="ssc_tab">',
         'after_section'  => '</div>',
     ) );
-    add_settings_field( 'sschw_enabled', 'Enable', 'sschw_field_checkbox', 'ssc', 'sschw_section' );
-    add_settings_field( 'sschw_token',   'API Token', 'sschw_field_password', 'ssc', 'sschw_section' );
+    add_settings_field( 'ssc_addon_helloworld_enabled', 'Enable',    'ssc_addon_helloworld_field_checkbox', 'ssc', 'ssc_addon_helloworld_section' );
+    add_settings_field( 'ssc_addon_helloworld_token',   'API Token', 'ssc_addon_helloworld_field_password', 'ssc', 'ssc_addon_helloworld_section' );
 } );
 
-// Sanitise our own keys when the form saves
+// Sanitise our own keys when the form saves (one shared ssc_options array — see decision §13.4)
 add_filter( 'ssc_sanitize_options', function( $sanitized, $input ) {
-    $sanitized['sschw_enabled'] = ! empty( $input['sschw_enabled'] );
-    $sanitized['sschw_token']   = sanitize_text_field( $input['sschw_token'] ?? '' );
+    $sanitized['ssc_addon_helloworld_enabled'] = ! empty( $input['ssc_addon_helloworld_enabled'] );
+    $sanitized['ssc_addon_helloworld_token']   = sanitize_text_field( $input['ssc_addon_helloworld_token'] ?? '' );
     return $sanitized;
 }, 10, 2 );
 ```
@@ -591,19 +598,19 @@ add_filter( 'ssc_sanitize_options', function( $sanitized, $input ) {
 // Enqueue our admin JS only on the SSC admin page
 add_action( 'admin_enqueue_scripts', function( $hook ) {
     if ( strpos( $hook, '_page_ssc' ) === false ) return;
-    wp_enqueue_script( 'sschw-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'ssc-admin', 'wp-hooks' ), '1.0.0', true );
+    wp_enqueue_script( 'ssc-addon-helloworld-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'ssc-admin', 'wp-hooks' ), '1.0.0', true );
 } );
 ```
 
 ```js
 // assets/admin.js
-wp.hooks.addFilter( 'ssc.admin.conversationColumns', 'sschw', (cols) => {
+wp.hooks.addFilter( 'ssc.admin.conversationColumns', 'ssc-addon-helloworld', (cols) => {
     cols.push({
         id: 'helloworld',
         label: 'Hello World',
         order: 25,
         render: (conv) => conv.channel === 'helloworld'
-            ? '<span class="ssc-badge sschw-badge">HW</span>'
+            ? '<span class="ssc-badge ssc-addon-helloworld-badge">HW</span>'
             : '',
     });
     return cols;
@@ -614,7 +621,7 @@ wp.hooks.addFilter( 'ssc.admin.conversationColumns', 'sschw', (cols) => {
 
 ```php
 add_action( 'ssc_enqueue_frontend', function() {
-    wp_enqueue_script( 'sschw-bubble', plugin_dir_url( __FILE__ ) . 'assets/bubble.js', array( 'ssc-chat-bubble' ), '1.0.0', true );
+    wp_enqueue_script( 'ssc-addon-helloworld-bubble', plugin_dir_url( __FILE__ ) . 'assets/bubble.js', array( 'ssc-chat-bubble' ), '1.0.0', true );
 } );
 
 add_filter( 'ssc_frontend_config', function( $config ) {
@@ -627,7 +634,7 @@ add_filter( 'ssc_frontend_config', function( $config ) {
 
 ```js
 // assets/bubble.js
-window.ssc.hooks.addFilter( 'ssc.bubble.actions', 'sschw', (actions) => {
+window.ssc.hooks.addFilter( 'ssc.bubble.actions', 'ssc-addon-helloworld', (actions) => {
     if ( ! ssc_config.helloworld?.url ) return actions;
     actions.push({
         id: 'hw-jump',
@@ -661,31 +668,41 @@ i.e. **every WhatsApp requirement maps to an extension point already in this pla
 
 ---
 
-## 13. Open questions for you
+## 13. Locked decisions
 
-Please review and let me know your preference on each:
+These are confirmed and drive the build. Listed in the same order as the original questions for traceability.
 
-1. **Discord — keep in core or extract to add-on?** Two options:
-   - **Keep in core (free with the chat plugin)** — easier upsell story ("buy the chat, get Discord free, buy WhatsApp/Slack as extras")
-   - **Extract Discord to its own add-on too** — cleaner separation, simpler core, more SKUs to sell. Means every customer needs at least 2 plugins.
-   - My recommendation: **keep Discord in core** but refactor it to use the new hooks (so it's the reference implementation).
+1. **Discord stays in core**, refactored to use the new hooks. Becomes the reference implementation that proves the API is sufficient.
 
-2. **Add-on API versioning policy** — How aggressively do we want to evolve the hook API? Strict semver (1.0 → 2.0 = breaking change requires all add-ons to update simultaneously) or relaxed (deprecate but don't remove)? My recommendation: **relaxed deprecation** — old hooks keep firing with `_deprecated_hook()` notices for at least 2 minor versions.
+2. **API versioning: break freely for now, lenient deprecation later.** No paying customers besides Dave's own server today, so we are explicitly *not* maintaining backward-compat shims during the initial refactor. Once we ship the first add-on commercially, the policy flips to "deprecate but keep firing for at least 2 minor versions with `_deprecated_hook()` notices." `SSC_ADDON_API_VERSION` still ships from day one so the policy switch is mechanical, not retroactive.
 
-3. **JS hooks — wp-hooks for both contexts, or wp-hooks (admin) + inline lib (bubble)?** My recommendation: **inline lib on bubble** to keep the front-end JS small (~40 lines vs +3KB gzipped). Same API surface.
+3. **JS hooks: wp-hooks on admin, tiny inline lib on the bubble.** Keep front-end JS small. Same API surface namespaced `ssc.`.
 
-4. **One save button or per-tab saves?** Today the whole settings form is one giant `<form>` with one save button. With add-ons writing to `ssc_options`, that means saving WhatsApp settings re-validates Discord settings. Should we move to **per-tab forms** (one save per channel) or stick with **one big save**? Recommendation: **stick with one big save** for v1; revisit if customers complain.
+4. **One big save form, one `ssc_options` array, one save button.** Tab navigation stays instant (no page reload between tabs). Add-ons write into the shared `ssc_options` array via the `ssc_sanitize_options` filter.
 
-5. **Add-on licence enforcement** — On licence expiry: degrade gracefully (still receive inbound, block outbound — so customers don't lose data) or hard-fail (auto-deactivate)? My recommendation: **degrade gracefully** + visible admin notice.
+5. **Licence expiry = graceful degradation.** Inbound continues to be received (no data loss), outbound is blocked, admin sees a clear notice with renewal link. No auto-deactivation.
 
-6. **DB migration for `channel` column** — Existing installs have conversations without a channel. Backfill default `'website'` on upgrade and detect Discord-originated conversations from `ssc_discord_threads` to backfill `'discord'`? Or leave them all as `'website'`? Recommendation: **backfill from `ssc_discord_threads`** during the DB upgrade — one-time `UPDATE … WHERE id IN (SELECT conversation_id FROM ssc_discord_threads)`.
+6. **DB migration: one-shot backfill.** Only Dave's server has data. The DB upgrade unconditionally runs `UPDATE ssc_conversations SET channel='discord' WHERE id IN (SELECT conversation_id FROM ssc_discord_threads)` and `UPDATE … SET channel='website'` for the rest. No defensive branching needed.
 
-7. **Pricing model** — Annual subscriptions per add-on (like core), or one-time purchase? Currently the rest of Super Speedy plugins are annual. Recommendation: **annual**, matching existing pattern.
+7. **Annual subscriptions** per add-on, matching the existing Super Speedy pattern.
 
-8. **Bundle pricing** — Offer a "Chat + all channels" bundle for a discount, or sell strictly à la carte? Up to your commercial preference; the technical implementation doesn't care.
+8. **Sell standalone, in an SSC + add-ons bundle, and in broader Super Speedy bundles.** Distribution is the licence server's problem; the plugin code is bundle-agnostic.
 
-9. **Add-on naming convention** — `super-speedy-chat-whatsapp` (long but explicit) or `ssc-whatsapp` (short but cryptic)? Recommendation: **the long form** for the plugin slug + WordPress.org-style identity, with `sschw` / `sscs` / `ssct` as PHP class/function prefixes.
+9. **Naming convention: `ssc-addon-{channel}`** (matches the `ssf-addon-x` family). PHP classes: `SSC_Addon_Whatsapp_*`. PHP functions / options: `ssc_addon_whatsapp_*`. All examples in §11 follow this.
 
-10. **Add-on directory bootstrap timing** — Add-ons run after core (`plugins_loaded` priority 20 in the example above). If two add-ons want to listen for `ssc_register_settings`, ordering can matter for tab order. Use explicit `order` keys (as in §5) rather than relying on priority. Agreed?
+10. **Tab ordering via explicit `order` keys**, not hook priority. Confirmed.
 
-11. **Cross-channel mirroring** — Should we support the same conversation being mirrored to multiple channels (e.g. visitor on the website, admin gets it on both Discord and WhatsApp)? The hook signatures allow it but no core UI is planned. Recommendation: **defer**, decide later based on demand.
+11. **Cross-channel mirroring: deferred.** The hook signatures don't preclude it (an add-on could already listen to `ssc_visitor_message_sent` and push regardless of `$conversation->channel`), but no core UI for "this conversation goes to both Discord and WhatsApp" is planned. Will revisit if a large client asks for "some admins on Discord, some on WhatsApp."
+
+---
+
+## 14. Next steps
+
+With decisions locked, the natural order of work is:
+
+1. **Core refactor** (2-3 days): wire the new hooks, extract `SSC_Chat::external_inbound()` / `get_or_create_external_conversation()`, add the `channel` column + one-shot backfill, ship `SSC_Addons` registry, refactor Discord to use the hooks. Behaviour-identical from the user's perspective.
+2. **Hello-world add-on** (0.5 day): build the reference add-on from §11 against the new API, confirm every example actually compiles and runs. Acts as the regression test for future API changes.
+3. **`ssc-addon-whatsapp`** (~4 days per the existing WhatsApp plan): the first real paid add-on, built against this API. Validates the API on a non-trivial channel (webhook signing, 24h window UX, no thread model).
+4. **Ship core 1.08** with the new API + refactored Discord. Mark `SSC_ADDON_API_VERSION = '1.0'`. From this point onward the deprecation policy from §13.2 applies.
+
+Ready to start the core refactor when you give the word.

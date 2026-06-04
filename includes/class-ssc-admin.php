@@ -33,7 +33,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             wp_enqueue_style( 'ssc-admin', SSC_URL . 'admin/admin.css', array(), SSC_VERSION );
-            wp_enqueue_script( 'ssc-admin', SSC_URL . 'admin/admin.js', array( 'jquery' ), SSC_VERSION, true );
+            wp_enqueue_script( 'ssc-admin', SSC_URL . 'admin/admin.js', array( 'jquery', 'wp-hooks' ), SSC_VERSION, true );
 
             $conversation_id = isset( $_GET['conversation_id'] ) ? absint( $_GET['conversation_id'] ) : 0;
             $current_user    = wp_get_current_user();
@@ -67,34 +67,34 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             register_setting( 'ssc_option_group', 'ssc_options', array( 'sanitize_callback' => array( $this, 'sanitize_options' ) ) );
 
             // ---- General section ----
-            add_settings_section( 'ssc_section_general', '', array( $this, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_general', '', array( __CLASS__, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
-            add_settings_field( 'ssc_enabled', __( 'Enable Chat', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_general', array(
+            add_settings_field( 'ssc_enabled', __( 'Enable Chat', 'super-speedy-chat' ), array( __CLASS__, 'field_checkbox' ), 'ssc', 'ssc_section_general', array(
                 'key' => 'ssc_enabled', 'label' => __( 'Enable chat bubble on front-end', 'super-speedy-chat' ), 'default' => true,
             ) );
-            add_settings_field( 'ssc_mu_enabled', __( 'Ultra Ajax', 'super-speedy-chat' ), array( $this, 'field_mu_enabled' ), 'ssc', 'ssc_section_general', array(
+            add_settings_field( 'ssc_mu_enabled', __( 'Ultra Ajax', 'super-speedy-chat' ), array( __CLASS__, 'field_mu_enabled' ), 'ssc', 'ssc_section_general', array(
                 'key' => 'ssc_mu_enabled', 'label' => __( 'Enable Ultra Ajax (mu-plugin)', 'super-speedy-chat' ), 'default' => true,
             ) );
-            add_settings_field( 'ssc_welcome_message', __( 'Welcome Message', 'super-speedy-chat' ), array( $this, 'field_textarea' ), 'ssc', 'ssc_section_general', array(
+            add_settings_field( 'ssc_welcome_message', __( 'Welcome Message', 'super-speedy-chat' ), array( __CLASS__, 'field_textarea' ), 'ssc', 'ssc_section_general', array(
                 'key' => 'ssc_welcome_message', 'default' => 'Hi! How can we help you today?', 'description' => __( 'Shown when a visitor opens the chat widget.', 'super-speedy-chat' ),
             ) );
 
             // ---- Display Names section ----
-            add_settings_section( 'ssc_section_display_names', '', array( $this, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_display_names', '', array( __CLASS__, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
-            add_settings_field( 'ssc_display_name_mode', __( 'Display Name Mode', 'super-speedy-chat' ), array( $this, 'field_display_name_mode' ), 'ssc', 'ssc_section_display_names' );
-            add_settings_field( 'ssc_shared_display_name', __( 'Shared Display Name', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_display_names', array(
+            add_settings_field( 'ssc_display_name_mode', __( 'Display Name Mode', 'super-speedy-chat' ), array( __CLASS__, 'field_display_name_mode' ), 'ssc', 'ssc_section_display_names' );
+            add_settings_field( 'ssc_shared_display_name', __( 'Shared Display Name', 'super-speedy-chat' ), array( __CLASS__, 'field_text' ), 'ssc', 'ssc_section_display_names', array(
                 'key' => 'ssc_shared_display_name', 'default' => 'Support', 'description' => __( 'Display name shown to visitors when all admins share one name.', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_my_display_name', __( 'Your Chat Display Name', 'super-speedy-chat' ), array( $this, 'field_my_display_name' ), 'ssc', 'ssc_section_display_names' );
+            add_settings_field( 'ssc_my_display_name', __( 'Your Chat Display Name', 'super-speedy-chat' ), array( __CLASS__, 'field_my_display_name' ), 'ssc', 'ssc_section_display_names' );
 
             // ---- Behaviour section ----
-            add_settings_section( 'ssc_section_behaviour', '', array( $this, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_behaviour', '', array( __CLASS__, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
-            add_settings_field( 'ssc_admin_timeout', __( 'Admin Reply Timeout', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_admin_timeout', __( 'Admin Reply Timeout', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_admin_timeout', 'default' => 30, 'description' => __( 'Seconds before triggering timeout action.', 'super-speedy-chat' ), 'suffix' => __( 'seconds', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_timeout_action', __( 'Timeout Action', 'super-speedy-chat' ), array( $this, 'field_select' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_timeout_action', __( 'Timeout Action', 'super-speedy-chat' ), array( __CLASS__, 'field_select' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_timeout_action', 'default' => 'show_email_prompt',
                 'options' => array(
                     'show_email_prompt'    => __( 'Show email prompt', 'super-speedy-chat' ),
@@ -103,10 +103,10 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                     'do_nothing'           => __( 'Do nothing', 'super-speedy-chat' ),
                 ),
             ) );
-            add_settings_field( 'ssc_login_prompt_after', __( 'Prompt Login After', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_login_prompt_after', __( 'Prompt Login After', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_login_prompt_after', 'default' => 5, 'suffix' => __( 'messages', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_max_message_length', __( 'Max Message Length', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_max_message_length', __( 'Max Message Length', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_max_message_length', 'default' => 500, 'suffix' => __( 'characters', 'super-speedy-chat' ),
             ) );
             $mu_active = SSC_MU_Installer::is_installed() && SSC_Settings::get_option( 'ssc_mu_enabled', true );
@@ -117,90 +117,84 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 ? __( 'Polling after 30s idle. Ultra Ajax active (default: 3000).', 'super-speedy-chat' )
                 : __( 'Polling after 30s idle (default: 5000).', 'super-speedy-chat' );
 
-            add_settings_field( 'ssc_poll_interval', __( 'Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_poll_interval', __( 'Poll Interval', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_poll_interval', 'default' => $mu_active ? 1000 : 2000, 'suffix' => __( 'ms', 'super-speedy-chat' ), 'description' => $poll_desc,
             ) );
-            add_settings_field( 'ssc_idle_poll_interval', __( 'Idle Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_idle_poll_interval', __( 'Idle Poll Interval', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_idle_poll_interval', 'default' => $mu_active ? 3000 : 5000, 'suffix' => __( 'ms', 'super-speedy-chat' ), 'description' => $idle_desc,
             ) );
-            add_settings_field( 'ssc_deep_idle_poll_interval', __( 'Deep Idle Poll Interval', 'super-speedy-chat' ), array( $this, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_deep_idle_poll_interval', __( 'Deep Idle Poll Interval', 'super-speedy-chat' ), array( __CLASS__, 'field_number' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_deep_idle_poll_interval', 'default' => $mu_active ? 10000 : 15000, 'suffix' => __( 'ms', 'super-speedy-chat' ),
                 'description' => __( 'Polling after 2 minutes idle.', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_play_sounds', __( 'Play Sounds', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_play_sounds', __( 'Play Sounds', 'super-speedy-chat' ), array( __CLASS__, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_play_sounds', 'label' => __( 'Play sounds on new messages and chat open/close', 'super-speedy-chat' ), 'default' => true,
             ) );
-            add_settings_field( 'ssc_sound_message', __( 'Message Sound', 'super-speedy-chat' ), array( $this, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_sound_message', __( 'Message Sound', 'super-speedy-chat' ), array( __CLASS__, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_sound_message', 'default' => 'msg.mp3',
             ) );
-            add_settings_field( 'ssc_sound_open', __( 'Open/Close Sound', 'super-speedy-chat' ), array( $this, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_sound_open', __( 'Open/Close Sound', 'super-speedy-chat' ), array( __CLASS__, 'field_sound_select' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_sound_open', 'default' => 'woosh.mp3',
             ) );
-            add_settings_field( 'ssc_sound_volume', __( 'Sound Volume', 'super-speedy-chat' ), array( $this, 'field_range' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_sound_volume', __( 'Sound Volume', 'super-speedy-chat' ), array( __CLASS__, 'field_range' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_sound_volume', 'default' => 30, 'min' => 0, 'max' => 100, 'suffix' => '%',
             ) );
-            add_settings_field( 'ssc_require_login', __( 'Require Login', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
+            add_settings_field( 'ssc_require_login', __( 'Require Login', 'super-speedy-chat' ), array( __CLASS__, 'field_checkbox' ), 'ssc', 'ssc_section_behaviour', array(
                 'key' => 'ssc_require_login', 'label' => __( 'Require login to chat', 'super-speedy-chat' ), 'default' => false,
             ) );
 
             // ---- Email section ----
-            add_settings_section( 'ssc_section_email', '', array( $this, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_email', '', array( __CLASS__, 'section_noop' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
-            add_settings_field( 'ssc_admin_email_enabled', __( 'Admin Email Notifications', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_email', array(
+            add_settings_field( 'ssc_admin_email_enabled', __( 'Admin Email Notifications', 'super-speedy-chat' ), array( __CLASS__, 'field_checkbox' ), 'ssc', 'ssc_section_email', array(
                 'key' => 'ssc_admin_email_enabled', 'label' => __( 'Email admin on new conversation', 'super-speedy-chat' ), 'default' => true,
             ) );
-            add_settings_field( 'ssc_admin_email', __( 'Admin Email', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_email', array(
+            add_settings_field( 'ssc_admin_email', __( 'Admin Email', 'super-speedy-chat' ), array( __CLASS__, 'field_text' ), 'ssc', 'ssc_section_email', array(
                 'key' => 'ssc_admin_email', 'default' => get_option( 'admin_email' ), 'description' => __( 'Email address for admin notifications.', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_visitor_email_enabled', __( 'Visitor Email Notifications', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_email', array(
+            add_settings_field( 'ssc_visitor_email_enabled', __( 'Visitor Email Notifications', 'super-speedy-chat' ), array( __CLASS__, 'field_checkbox' ), 'ssc', 'ssc_section_email', array(
                 'key' => 'ssc_visitor_email_enabled', 'label' => __( 'Email visitor when admin replies offline', 'super-speedy-chat' ), 'default' => true,
             ) );
-            add_settings_field( 'ssc_email_from_name', __( 'From Name', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_email', array(
+            add_settings_field( 'ssc_email_from_name', __( 'From Name', 'super-speedy-chat' ), array( __CLASS__, 'field_text' ), 'ssc', 'ssc_section_email', array(
                 'key' => 'ssc_email_from_name', 'default' => get_bloginfo( 'name' ),
             ) );
 
             // ---- Canned Responses section ----
-            add_settings_section( 'ssc_section_canned', '', array( $this, 'section_canned_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_canned', '', array( __CLASS__, 'section_canned_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
             // ---- LLM section ----
-            add_settings_section( 'ssc_section_llm', '', array( $this, 'section_llm_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_llm', '', array( __CLASS__, 'section_llm_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
 
-            add_settings_field( 'ssc_llm_provider', __( 'LLM Provider', 'super-speedy-chat' ), array( $this, 'field_select' ), 'ssc', 'ssc_section_llm', array(
+            add_settings_field( 'ssc_llm_provider', __( 'LLM Provider', 'super-speedy-chat' ), array( __CLASS__, 'field_select' ), 'ssc', 'ssc_section_llm', array(
                 'key' => 'ssc_llm_provider', 'default' => '',
                 'options' => array( '' => __( '— Disabled —', 'super-speedy-chat' ), 'openai' => 'OpenAI', 'anthropic' => 'Anthropic' ),
             ) );
-            add_settings_field( 'ssc_llm_api_key', __( 'API Key', 'super-speedy-chat' ), array( $this, 'field_password' ), 'ssc', 'ssc_section_llm', array(
+            add_settings_field( 'ssc_llm_api_key', __( 'API Key', 'super-speedy-chat' ), array( __CLASS__, 'field_password' ), 'ssc', 'ssc_section_llm', array(
                 'key' => 'ssc_llm_api_key', 'default' => '', 'description' => __( 'Your API key. Stored in the database — use a key with minimal permissions.', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_llm_model', __( 'Model', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_llm', array(
+            add_settings_field( 'ssc_llm_model', __( 'Model', 'super-speedy-chat' ), array( __CLASS__, 'field_text' ), 'ssc', 'ssc_section_llm', array(
                 'key' => 'ssc_llm_model', 'default' => '',
                 'description' => __( 'Leave blank for default (gpt-4o-mini / claude-haiku-4-5). Use the cheapest model — this is just a classifier.', 'super-speedy-chat' ),
             ) );
-            add_settings_field( 'ssc_llm_system_prompt', __( 'System Prompt', 'super-speedy-chat' ), array( $this, 'field_textarea' ), 'ssc', 'ssc_section_llm', array(
+            add_settings_field( 'ssc_llm_system_prompt', __( 'System Prompt', 'super-speedy-chat' ), array( __CLASS__, 'field_textarea' ), 'ssc', 'ssc_section_llm', array(
                 'key' => 'ssc_llm_system_prompt',
                 'default' => 'You are a classifier for a live chat support system. Given a visitor\'s question and a list of canned responses, pick the best matching canned response number. If none are a good match, respond with 0. Respond with ONLY the number, nothing else.',
                 'description' => __( 'Instructions for the LLM classifier. The default works well — only change if needed.', 'super-speedy-chat' ),
             ) );
 
-            // ---- Discord section ----
-            add_settings_section( 'ssc_section_discord', '', array( $this, 'section_discord_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
-
-            add_settings_field( 'ssc_discord_enabled', __( 'Enable Discord', 'super-speedy-chat' ), array( $this, 'field_checkbox' ), 'ssc', 'ssc_section_discord', array(
-                'key' => 'ssc_discord_enabled', 'label' => __( 'Enable Discord integration', 'super-speedy-chat' ), 'default' => false,
-            ) );
-            add_settings_field( 'ssc_discord_bot_token', __( 'Bot Token', 'super-speedy-chat' ), array( $this, 'field_password' ), 'ssc', 'ssc_section_discord', array(
-                'key' => 'ssc_discord_bot_token', 'default' => '', 'description' => __( 'Your Discord bot token. Keep this secret.', 'super-speedy-chat' ),
-            ) );
-            add_settings_field( 'ssc_discord_channel_id', __( 'Channel ID', 'super-speedy-chat' ), array( $this, 'field_text' ), 'ssc', 'ssc_section_discord', array(
-                'key' => 'ssc_discord_channel_id', 'default' => '', 'description' => __( 'The Discord channel where chat threads will be created.', 'super-speedy-chat' ),
-            ) );
-            add_settings_field( 'ssc_discord_bot_info', __( 'Bot Connection Info', 'super-speedy-chat' ), array( $this, 'field_discord_bot_info' ), 'ssc', 'ssc_section_discord' );
-
             // ---- Status section ----
-            add_settings_section( 'ssc_section_status', '', array( $this, 'section_status_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+            add_settings_section( 'ssc_section_status', '', array( __CLASS__, 'section_status_callback' ), 'ssc', array( 'before_section' => '<div class="ssc_tab">', 'after_section' => '</div>' ) );
+
+            /**
+             * Let channel add-ons register their own settings sections + fields.
+             *
+             * Core's Discord settings are registered via this hook from class-ssc-discord.php
+             * (refactored out of this class to dogfood the add-on extension API).
+             */
+            do_action( 'ssc_register_settings' );
         }
 
-        public function section_noop() {}
+        public static function section_noop() {}
 
         // -------------------------------------------------------------------
         // Page Rendering
@@ -227,16 +221,28 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             $tabs = array(
-                'chats'         => __( 'Chats', 'super-speedy-chat' ),
-                'general'       => __( 'General', 'super-speedy-chat' ),
-                'display_names' => __( 'Display Names', 'super-speedy-chat' ),
-                'behaviour'     => __( 'Behaviour', 'super-speedy-chat' ),
-                'email'         => __( 'Email', 'super-speedy-chat' ),
-                'canned'        => __( 'Canned Responses', 'super-speedy-chat' ),
-                'llm'           => __( 'LLM Auto-Reply', 'super-speedy-chat' ),
-                'discord'       => __( 'Discord', 'super-speedy-chat' ),
-                'status'        => __( 'Status', 'super-speedy-chat' ),
+                'chats'         => array( 'label' => __( 'Chats', 'super-speedy-chat' ),            'order' => 10 ),
+                'general'       => array( 'label' => __( 'General', 'super-speedy-chat' ),          'order' => 20 ),
+                'display_names' => array( 'label' => __( 'Display Names', 'super-speedy-chat' ),    'order' => 30 ),
+                'behaviour'     => array( 'label' => __( 'Behaviour', 'super-speedy-chat' ),        'order' => 40 ),
+                'email'         => array( 'label' => __( 'Email', 'super-speedy-chat' ),            'order' => 50 ),
+                'canned'        => array( 'label' => __( 'Canned Responses', 'super-speedy-chat' ), 'order' => 60 ),
+                'llm'           => array( 'label' => __( 'LLM Auto-Reply', 'super-speedy-chat' ),   'order' => 70 ),
+                'status'        => array( 'label' => __( 'Status', 'super-speedy-chat' ),           'order' => 100 ),
             );
+
+            /**
+             * Let channel add-ons append (or modify) tabs.
+             *
+             * Tab keys map to the `id` of the corresponding <div class="ssc_tab"> rendered
+             * by add_settings_section(). Order is explicit (not by hook priority).
+             */
+            $tabs = apply_filters( 'ssc_settings_tabs', $tabs );
+            uasort( $tabs, function( $a, $b ) {
+                $ao = isset( $a['order'] ) ? (int) $a['order'] : 999;
+                $bo = isset( $b['order'] ) ? (int) $b['order'] : 999;
+                return $ao <=> $bo;
+            } );
 
             ?>
             <div class="super-speedy-chat wrap">
@@ -246,8 +252,9 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 <h2 class="nav-tab-wrapper">
                     <?php
                     $class = ' nav-tab-active';
-                    foreach ( $tabs as $tab_id => $tab_name ) {
-                        echo '<a class="nav-tab' . $class . '" href="#' . esc_attr( $tab_id ) . '">' . esc_html( $tab_name ) . '</a>';
+                    foreach ( $tabs as $tab_id => $tab ) {
+                        $label = is_array( $tab ) ? ( isset( $tab['label'] ) ? $tab['label'] : $tab_id ) : $tab;
+                        echo '<a class="nav-tab' . $class . '" href="#' . esc_attr( $tab_id ) . '">' . esc_html( $label ) . '</a>';
                         $class = '';
                     }
                     ?>
@@ -349,7 +356,8 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
         // -------------------------------------------------------------------
 
         private function render_conversation_detail( $conversation_id ) {
-            $list_url = admin_url( 'admin.php?page=ssc' );
+            $list_url     = admin_url( 'admin.php?page=ssc' );
+            $conversation = SSC_DB::get_conversation( $conversation_id );
             ?>
             <div id="ssc-conversation-detail" data-conversation-id="<?php echo esc_attr( $conversation_id ); ?>">
                 <div class="ssc-detail-header">
@@ -376,6 +384,15 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                                 </select>
                             </dd>
                         </dl>
+                        <?php
+                        /**
+                         * Channel add-ons can render extra sidebar panels here (phone number,
+                         * external profile link, channel-specific timestamps, etc.).
+                         */
+                        if ( $conversation ) {
+                            do_action( 'ssc_conversation_sidebar', $conversation );
+                        }
+                        ?>
                     </div>
                     <div class="ssc-detail-main">
                         <div class="ssc-messages-thread" id="ssc-messages-thread">
@@ -384,6 +401,15 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                         <div class="ssc-reply-form" id="ssc-reply-form">
                             <textarea id="ssc-reply-textarea" rows="3" placeholder="<?php esc_attr_e( 'Type your reply...', 'super-speedy-chat' ); ?>"></textarea>
                             <button class="button button-primary" id="ssc-send-reply"><?php esc_html_e( 'Send', 'super-speedy-chat' ); ?></button>
+                            <?php
+                            /**
+                             * Channel add-ons can render notices below the reply box
+                             * (e.g. WhatsApp 24-hour-window warning, template-message buttons).
+                             */
+                            if ( $conversation ) {
+                                do_action( 'ssc_conversation_reply_footer', $conversation );
+                            }
+                            ?>
                         </div>
                     </div>
                 </div>
@@ -395,7 +421,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
         // Field Renderers
         // -------------------------------------------------------------------
 
-        public function field_checkbox( $args ) {
+        public static function field_checkbox( $args ) {
             $key     = $args['key'];
             $default = isset( $args['default'] ) ? $args['default'] : false;
             $label   = isset( $args['label'] ) ? $args['label'] : '';
@@ -409,8 +435,8 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             );
         }
 
-        public function field_mu_enabled( $args ) {
-            $this->field_checkbox( $args );
+        public static function field_mu_enabled( $args ) {
+            self::field_checkbox( $args );
 
             $mu_file   = defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR . '/ssc-fast-ajax.php' : '';
             $mu_exists = $mu_file && file_exists( $mu_file );
@@ -422,7 +448,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
         }
 
-        public function field_text( $args ) {
+        public static function field_text( $args ) {
             $key         = $args['key'];
             $default     = isset( $args['default'] ) ? $args['default'] : '';
             $description = isset( $args['description'] ) ? $args['description'] : '';
@@ -438,7 +464,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
         }
 
-        public function field_textarea( $args ) {
+        public static function field_textarea( $args ) {
             $key         = $args['key'];
             $default     = isset( $args['default'] ) ? $args['default'] : '';
             $description = isset( $args['description'] ) ? $args['description'] : '';
@@ -450,7 +476,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
         }
 
-        public function field_number( $args ) {
+        public static function field_number( $args ) {
             $key    = $args['key'];
             $default = isset( $args['default'] ) ? $args['default'] : 0;
             $description = isset( $args['description'] ) ? $args['description'] : '';
@@ -466,7 +492,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
         }
 
-        public function field_sound_select( $args ) {
+        public static function field_sound_select( $args ) {
             $key     = $args['key'];
             $default = isset( $args['default'] ) ? $args['default'] : 'msg.mp3';
             $value   = SSC_Settings::get_option( $key, $default );
@@ -490,7 +516,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             printf( ' <button type="button" class="button button-small ssc-preview-sound" data-select="%s">&#9654; Preview</button>', esc_attr( $key ) );
         }
 
-        public function field_range( $args ) {
+        public static function field_range( $args ) {
             $key     = $args['key'];
             $default = isset( $args['default'] ) ? $args['default'] : 50;
             $min     = isset( $args['min'] ) ? $args['min'] : 0;
@@ -505,7 +531,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             printf( ' <span class="ssc-range-value">%s%s</span>', esc_html( $value ), esc_html( $suffix ) );
         }
 
-        public function field_select( $args ) {
+        public static function field_select( $args ) {
             $key     = $args['key'];
             $default = isset( $args['default'] ) ? $args['default'] : '';
             $options = isset( $args['options'] ) ? $args['options'] : array();
@@ -520,7 +546,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
 
         // ---- Display name fields ----
 
-        public function field_display_name_mode() {
+        public static function field_display_name_mode() {
             $mode = SSC_Settings::get_option( 'ssc_display_name_mode', 'shared' );
             ?>
             <fieldset>
@@ -537,7 +563,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             <?php
         }
 
-        public function field_my_display_name() {
+        public static function field_my_display_name() {
             $user_id      = get_current_user_id();
             $current_user = wp_get_current_user();
             $saved_name   = get_user_meta( $user_id, 'ssc_chat_display_name', true );
@@ -550,7 +576,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             echo '<p class="description">' . esc_html__( 'Your personal display name shown in chat when using individual mode. Saved per-user.', 'super-speedy-chat' ) . '</p>';
         }
 
-        public function field_password( $args ) {
+        public static function field_password( $args ) {
             $key         = $args['key'];
             $default     = isset( $args['default'] ) ? $args['default'] : '';
             $description = isset( $args['description'] ) ? $args['description'] : '';
@@ -568,7 +594,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
 
         // ---- Canned Responses section callback ----
 
-        public function section_canned_callback() {
+        public static function section_canned_callback() {
             ?>
             <div class="ssc-guide-box">
                 <h3><?php esc_html_e( 'How Canned Responses Work', 'super-speedy-chat' ); ?></h3>
@@ -605,7 +631,7 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
 
         // ---- LLM section callback ----
 
-        public function section_llm_callback() {
+        public static function section_llm_callback() {
             ?>
             <div class="ssc-guide-box">
                 <h3><?php esc_html_e( 'LLM Auto-Reply — Canned Response Classifier', 'super-speedy-chat' ); ?></h3>
@@ -631,77 +657,12 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             <?php
         }
 
-        // ---- Discord section callback ----
-
-        public function section_discord_callback() {
-            ?>
-            <div class="ssc-guide-box">
-                <h3><?php esc_html_e( 'Discord Integration — Instant Bidirectional Chat', 'super-speedy-chat' ); ?></h3>
-                <p><?php esc_html_e( 'Chat with your visitors in real-time directly from Discord. Visitor messages appear instantly in Discord threads, and your Discord replies are delivered to visitors instantly.', 'super-speedy-chat' ); ?></p>
-
-                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 1: Create a Discord Bot', 'super-speedy-chat' ); ?></h4>
-                <ol>
-                    <li><?php
-                        printf(
-                            __( 'Go to the <a href="%s" target="_blank">Discord Developer Portal</a> and create a New Application.', 'super-speedy-chat' ),
-                            'https://discord.com/developers/applications'
-                        );
-                    ?></li>
-                    <li><?php esc_html_e( 'Go to the Bot tab and click "Reset Token" to get your bot token. Copy it.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Under Privileged Gateway Intents, enable MESSAGE CONTENT INTENT.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Go to OAuth2 > URL Generator. Select the "bot" scope.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Select permissions: Send Messages, Create Public Threads, Send Messages in Threads, Read Message History.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Copy the generated URL, open it, and add the bot to your server.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Enable Developer Mode in Discord (User Settings > Advanced), right-click your channel, Copy Channel ID.', 'super-speedy-chat' ); ?></li>
-                </ol>
-
-                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 2: Configure Settings Below & Save', 'super-speedy-chat' ); ?></h4>
-                <p><?php esc_html_e( 'Enter your bot token and channel ID below, enable the integration, and click Save. Visitor messages will start appearing in Discord immediately.', 'super-speedy-chat' ); ?></p>
-
-                <h4 style="margin-top:16px;"><?php esc_html_e( 'Step 3: Install the Companion Bot (for Discord → WordPress replies)', 'super-speedy-chat' ); ?></h4>
-                <p><?php esc_html_e( 'To receive your Discord replies back in WordPress instantly, install the companion Node.js bot on your server:', 'super-speedy-chat' ); ?></p>
-                <ol>
-                    <li><?php esc_html_e( 'Requires Node.js 18+ on your server.', 'super-speedy-chat' ); ?></li>
-                    <li><?php
-                        printf(
-                            __( 'Copy the <code>bot/</code> folder from <code>%s</code> to a location on your server.', 'super-speedy-chat' ),
-                            esc_html( SSC_DIR . 'bot/' )
-                        );
-                    ?></li>
-                    <li><?php esc_html_e( 'Run: npm install', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Copy .env.example to .env and fill in the values from "Bot Connection Info" below.', 'super-speedy-chat' ); ?></li>
-                    <li><?php esc_html_e( 'Run: node discord-bot.js (or use PM2/systemd to keep it running).', 'super-speedy-chat' ); ?></li>
-                </ol>
-                <p><em><?php esc_html_e( 'Without the companion bot, visitor messages still go to Discord instantly, but your Discord replies won\'t reach visitors until you reply from wp-admin.', 'super-speedy-chat' ); ?></em></p>
-                <p><button type="button" class="button" id="ssc-discord-test"><?php esc_html_e( 'Test Connection', 'super-speedy-chat' ); ?></button> <span id="ssc-discord-test-result"></span></p>
-            </div>
-            <?php
-        }
-
-        /**
-         * Display the webhook secret and site URL for the Discord bot config.
-         */
-        public function field_discord_bot_info() {
-            $secret   = SSC_Discord::get_webhook_secret();
-            $rest_url = rest_url( 'ssc/v1/discord/incoming' );
-            ?>
-            <div style="background:#f9f9f9; border:1px solid #e0e0e0; border-radius:4px; padding:12px; max-width:600px;">
-                <p style="margin-top:0;">
-                    <strong><?php esc_html_e( 'Webhook Secret:', 'super-speedy-chat' ); ?></strong><br>
-                    <code id="ssc-discord-secret" style="user-select:all; font-size:12px;"><?php echo esc_html( $secret ); ?></code>
-                </p>
-                <p style="margin-bottom:0;">
-                    <strong><?php esc_html_e( 'WordPress Endpoint URL:', 'super-speedy-chat' ); ?></strong><br>
-                    <code id="ssc-discord-endpoint" style="user-select:all; font-size:12px;"><?php echo esc_html( $rest_url ); ?></code>
-                </p>
-            </div>
-            <p class="description"><?php esc_html_e( 'Copy these values into your bot\'s .env file.', 'super-speedy-chat' ); ?></p>
-            <?php
-        }
+        // Discord renderers were moved to class-ssc-discord.php — that class now
+        // owns its tab/section/fields via the ssc_register_settings hook.
 
         // ---- Status section callback ----
 
-        public function section_status_callback() {
+        public static function section_status_callback() {
             if ( class_exists( 'SSC_MU_Installer' ) ) {
                 SSC_MU_Installer::check_and_update();
             }
@@ -747,13 +708,13 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
             }
 
             // Checkboxes.
-            $cb_keys = array( 'ssc_enabled', 'ssc_mu_enabled', 'ssc_play_sounds', 'ssc_require_login', 'ssc_admin_email_enabled', 'ssc_visitor_email_enabled', 'ssc_discord_enabled' );
+            $cb_keys = array( 'ssc_enabled', 'ssc_mu_enabled', 'ssc_play_sounds', 'ssc_require_login', 'ssc_admin_email_enabled', 'ssc_visitor_email_enabled' );
             foreach ( $cb_keys as $k ) {
                 $sanitized[ $k ] = ! empty( $input[ $k ] );
             }
 
             // Text.
-            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_discord_bot_token', 'ssc_discord_channel_id', 'ssc_llm_api_key', 'ssc_llm_model' );
+            $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_llm_api_key', 'ssc_llm_model' );
             foreach ( $text_keys as $k ) {
                 $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_text_field( $input[ $k ] ) : '';
             }
@@ -794,22 +755,19 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 update_user_meta( get_current_user_id(), 'ssc_chat_display_name', $my_name );
             }
 
-            // Preserve the auto-generated webhook secret (not submitted via form).
-            // Check $input first (covers direct update_option calls from get_webhook_secret),
-            // then fall back to existing DB value (covers form submissions).
-            if ( ! empty( $input['ssc_discord_webhook_secret'] ) ) {
-                $sanitized['ssc_discord_webhook_secret'] = sanitize_text_field( $input['ssc_discord_webhook_secret'] );
-            } else {
-                $existing = get_option( 'ssc_options', array() );
-                if ( ! empty( $existing['ssc_discord_webhook_secret'] ) ) {
-                    $sanitized['ssc_discord_webhook_secret'] = $existing['ssc_discord_webhook_secret'];
-                }
-            }
-
             // Trigger mu-plugin install/update on save.
             if ( ! empty( $sanitized['ssc_mu_enabled'] ) && class_exists( 'SSC_MU_Installer' ) ) {
                 SSC_MU_Installer::install();
             }
+
+            /**
+             * Let channel add-ons sanitise their own keys in the shared ssc_options array.
+             *
+             * Discord (now refactored to listen on this filter) and any third-party add-on
+             * add their keys here. Discord's webhook-secret preservation lives in its own
+             * listener now, not here.
+             */
+            $sanitized = apply_filters( 'ssc_sanitize_options', $sanitized, $input );
 
             return $sanitized;
         }

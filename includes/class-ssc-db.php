@@ -7,7 +7,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
     class SSC_DB {
 
-        const DB_VERSION = '3.0.0';
+        const DB_VERSION = '4.0.0';
 
         /**
          * Get the full table name with prefix.
@@ -22,6 +22,8 @@ if ( ! class_exists( 'SSC_DB' ) ) {
          */
         public static function create_tables() {
             global $wpdb;
+
+            $previous_version = get_option( 'ssc_db_version', '0' );
 
             $charset_collate = $wpdb->get_charset_collate();
 
@@ -39,6 +41,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 visitor_name VARCHAR(100) NOT NULL DEFAULT 'Visitor',
                 visitor_email VARCHAR(255) NULL,
                 status ENUM('active','waiting','closed','archived') DEFAULT 'active',
+                channel VARCHAR(32) NOT NULL DEFAULT 'website',
                 started_at DATETIME NOT NULL,
                 last_message_at DATETIME NOT NULL,
                 last_page_url TEXT NULL,
@@ -50,6 +53,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 PRIMARY KEY  (id),
                 INDEX idx_visitor_hash (visitor_hash),
                 INDEX idx_status_last_message (status, last_message_at),
+                INDEX idx_channel (channel),
                 INDEX idx_assigned_to (assigned_to)
             ) {$charset_collate};
 
@@ -110,6 +114,16 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';
             dbDelta( $sql );
+
+            // One-shot backfill for v4.0.0: tag pre-existing conversations with their channel.
+            // The dbDelta call above adds `channel` defaulting to 'website'; this query
+            // overrides that for conversations that originated in Discord.
+            if ( version_compare( $previous_version, '4.0.0', '<' ) ) {
+                $wpdb->query(
+                    "UPDATE {$conversations_table} SET channel = 'discord'
+                     WHERE id IN ( SELECT conversation_id FROM {$discord_table} )"
+                );
+            }
 
             update_option( 'ssc_db_version', self::DB_VERSION );
         }

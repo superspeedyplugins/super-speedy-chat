@@ -110,19 +110,14 @@ if ( ! class_exists( 'SSC_REST' ) ) {
                 ),
             ) );
 
-            // Admin: test Discord connection.
-            register_rest_route( self::REST_NAMESPACE, '/admin/discord/test', array(
-                'methods'             => 'POST',
-                'callback'            => array( $this, 'handle_discord_test' ),
-                'permission_callback' => array( $this, 'check_admin_permission' ),
-            ) );
-
-            // Discord bot: incoming message relay (authenticated via shared secret).
-            register_rest_route( self::REST_NAMESPACE, '/discord/incoming', array(
-                'methods'             => 'POST',
-                'callback'            => array( $this, 'handle_discord_incoming' ),
-                'permission_callback' => '__return_true',
-            ) );
+            /**
+             * Let channel add-ons register their own REST routes.
+             *
+             * Add-ons hook this to add e.g. `/whatsapp/incoming`, `/telegram/webhook`, etc.
+             * Core's own Discord routes are registered via this same hook from
+             * class-ssc-discord.php.
+             */
+            do_action( 'ssc_register_rest_routes', $this );
         }
 
         /**
@@ -307,6 +302,15 @@ if ( ! class_exists( 'SSC_REST' ) ) {
 
             if ( ! SSC_LLM::is_enabled() ) {
                 return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'llm_not_configured' ) );
+            }
+
+            // Only classify for a real, in-progress conversation, and at most once
+            // per conversation — both bound paid LLM calls on this public endpoint.
+            if ( SSC_Chat::get_visitor_message_count( $conversation->id ) < 1 ) {
+                return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'no_visitor_message' ) );
+            }
+            if ( SSC_Chat::has_auto_reply( $conversation->id ) ) {
+                return rest_ensure_response( array( 'auto_replied' => false, 'reason' => 'already_auto_replied' ) );
             }
 
             $question = sanitize_text_field( $request->get_param( 'question' ) );
@@ -516,50 +520,8 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             return rest_ensure_response( array( 'success' => true ) );
         }
 
-        /**
-         * POST /ssc/v1/discord/incoming
-         * Receives messages from the Discord bot relay.
-         * Authenticated via X-SSC-Secret header (shared secret).
-         */
-        public function handle_discord_incoming( $request ) {
-            $secret = $request->get_header( 'X-SSC-Secret' );
-            if ( ! SSC_Discord::verify_secret( $secret ) ) {
-                return new WP_Error( 'unauthorized', __( 'Invalid or missing secret.', 'super-speedy-chat' ), array( 'status' => 401 ) );
-            }
-
-            $thread_id   = sanitize_text_field( $request->get_param( 'thread_id' ) );
-            $author_name = sanitize_text_field( $request->get_param( 'author_name' ) );
-            $message     = sanitize_text_field( $request->get_param( 'message' ) );
-
-            if ( empty( $thread_id ) || empty( $message ) ) {
-                return new WP_Error( 'missing_params', __( 'Missing required parameters.', 'super-speedy-chat' ), array( 'status' => 400 ) );
-            }
-
-            if ( empty( $author_name ) ) {
-                $author_name = 'Discord Admin';
-            }
-
-            $message_id = SSC_Discord::handle_incoming( $thread_id, $author_name, $message );
-
-            if ( ! $message_id ) {
-                return new WP_Error( 'not_found', __( 'Thread not found or message could not be created.', 'super-speedy-chat' ), array( 'status' => 404 ) );
-            }
-
-            return rest_ensure_response( array( 'success' => true, 'message_id' => $message_id ) );
-        }
-
-        public function handle_discord_test( $request ) {
-            $result = SSC_Discord::test_connection();
-
-            if ( is_wp_error( $result ) ) {
-                return $result;
-            }
-
-            return rest_ensure_response( array(
-                'success'  => true,
-                'bot_name' => isset( $result['username'] ) ? $result['username'] : 'Unknown',
-            ) );
-        }
+        // Discord REST handlers were moved to class-ssc-discord.php — that class
+        // now registers its own routes via the ssc_register_rest_routes hook.
 
         // -------------------------------------------------------------------
         // Static handler methods (called by both REST API and mu-plugin)
@@ -730,7 +692,16 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             if ( empty( $visitor_hash ) ) {
                 $visitor_hash = bin2hex( random_bytes( 32 ) );
                 $expire       = time() + ( 365 * DAY_IN_SECONDS );
-                setcookie( 'ssc_visitor_hash', $visitor_hash, $expire, '/', '', is_ssl(), true );
+                // Mirror SSC_Session::get_or_create_visitor_hash() — explicit
+                // SameSite=Lax + HttpOnly for deterministic cross-site behaviour.
+                setcookie( 'ssc_visitor_hash', $visitor_hash, array(
+                    'expires'  => $expire,
+                    'path'     => '/',
+                    'domain'   => '',
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ) );
             }
 
             global $wpdb;
@@ -814,6 +785,15 @@ if ( ! class_exists( 'SSC_REST' ) ) {
 
             if ( ! $conversation ) {
                 return array( 'auto_replied' => false, 'reason' => 'no_conversation' );
+            }
+
+            // Mirror handle_auto_reply(): require an in-progress conversation and
+            // classify at most once per conversation to bound paid LLM calls.
+            if ( SSC_Chat::get_visitor_message_count( $conversation->id ) < 1 ) {
+                return array( 'auto_replied' => false, 'reason' => 'no_visitor_message' );
+            }
+            if ( SSC_Chat::has_auto_reply( $conversation->id ) ) {
+                return array( 'auto_replied' => false, 'reason' => 'already_auto_replied' );
             }
 
             $match = SSC_LLM::classify_question( $question );
