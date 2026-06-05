@@ -162,6 +162,24 @@ if ( ! class_exists( 'SSC_REST' ) ) {
             return true;
         }
 
+        /**
+         * When the Require Login setting is on, the visitor endpoints are only
+         * available to logged-in users. Returns true if allowed, WP_Error if not.
+         *
+         * Note: the mu-plugin fast path can't authenticate (it runs before
+         * WordPress auth is loaded), so when this setting is on the mu-plugin
+         * falls through to the normal REST API and this check is authoritative.
+         *
+         * @return true|WP_Error
+         */
+        private static function check_require_login() {
+            if ( SSC_Settings::get_option( 'ssc_require_login', false ) && ! is_user_logged_in() ) {
+                return new WP_Error( 'login_required', __( 'Please log in to use chat.', 'super-speedy-chat' ), array( 'status' => 401 ) );
+            }
+
+            return true;
+        }
+
         // -------------------------------------------------------------------
         // Visitor Handlers
         // -------------------------------------------------------------------
@@ -171,6 +189,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Creates or resumes a session. Returns conversation_id and visitor_hash.
          */
         public function handle_session( $request ) {
+            $login_check = self::check_require_login();
+            if ( is_wp_error( $login_check ) ) {
+                return $login_check;
+            }
+
             $rate_check = self::check_rate_limit( 'session', 10, 60 );
             if ( is_wp_error( $rate_check ) ) {
                 return $rate_check;
@@ -204,6 +227,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Visitor sends a message.
          */
         public function handle_send( $request ) {
+            $login_check = self::check_require_login();
+            if ( is_wp_error( $login_check ) ) {
+                return $login_check;
+            }
+
             $rate_check = self::check_rate_limit( 'send', 15, 60 );
             if ( is_wp_error( $rate_check ) ) {
                 return $rate_check;
@@ -237,6 +265,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Visitor polls for new messages.
          */
         public function handle_poll( $request ) {
+            $login_check = self::check_require_login();
+            if ( is_wp_error( $login_check ) ) {
+                return $login_check;
+            }
+
             $visitor_hash = SSC_Session::get_visitor_hash();
             if ( ! $visitor_hash ) {
                 return new WP_Error( 'no_session', __( 'No active session.', 'super-speedy-chat' ), array( 'status' => 403 ) );
@@ -260,6 +293,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Visitor provides their email address.
          */
         public function handle_email( $request ) {
+            $login_check = self::check_require_login();
+            if ( is_wp_error( $login_check ) ) {
+                return $login_check;
+            }
+
             $visitor_hash = SSC_Session::get_visitor_hash();
             if ( ! $visitor_hash ) {
                 return new WP_Error( 'no_session', __( 'No active session.', 'super-speedy-chat' ), array( 'status' => 403 ) );
@@ -285,6 +323,11 @@ if ( ! class_exists( 'SSC_REST' ) ) {
          * Visitor requests an auto-reply via LLM canned response classifier.
          */
         public function handle_auto_reply( $request ) {
+            $login_check = self::check_require_login();
+            if ( is_wp_error( $login_check ) ) {
+                return $login_check;
+            }
+
             $rate_check = self::check_rate_limit( 'auto_reply', 3, 60 );
             if ( is_wp_error( $rate_check ) ) {
                 return $rate_check;

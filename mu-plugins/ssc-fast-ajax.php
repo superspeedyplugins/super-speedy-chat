@@ -3,7 +3,7 @@
  * Plugin Name: Super Speedy Chat Fast Ajax
  * Description: Speeds up AJAX requests for Super Speedy Chat by bypassing full WordPress loading.
  * Author: Dave Hilditch
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author URI: https://www.superspeedyplugins.com
  */
 
@@ -34,6 +34,13 @@ $ssc_mu_options = get_option( 'ssc_options', array() );
 $ssc_mu_enabled = isset( $ssc_mu_options['ssc_mu_enabled'] ) ? $ssc_mu_options['ssc_mu_enabled'] : true;
 if ( ! $ssc_mu_enabled ) {
     return; // Fall through to normal REST API.
+}
+
+// If Require Login is on, chat requests need real WordPress authentication,
+// which isn't loaded this early — fall through to the normal REST API, where
+// SSC_REST::check_require_login() enforces it against the actual user session.
+if ( ! empty( $ssc_mu_options['ssc_require_login'] ) ) {
+    return;
 }
 
 // Parse the route to determine the command.

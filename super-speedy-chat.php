@@ -5,7 +5,7 @@ Plugin URI: https://www.superspeedyplugins.com
 Author: Dave Hilditch (Super Speedy Plugins)
 Author URI: https://www.superspeedyplugins.com
 Text Domain: super-speedy-chat
-Version: 1.08
+Version: 1.09
 Description: The fastest live chat plugin for WordPress. Ultra-fast AJAX via mu-plugin, visitor-to-admin chat with email fallback.
 */
 
@@ -134,6 +134,7 @@ function ssc_enqueue_frontend_assets() {
     $admin_timeout      = SSC_Settings::get_option( 'ssc_admin_timeout', 30 );
     $timeout_action     = SSC_Settings::get_option( 'ssc_timeout_action', 'show_email_prompt' );
     $login_prompt_after = SSC_Settings::get_option( 'ssc_login_prompt_after', 5 );
+    $require_login      = SSC_Settings::get_option( 'ssc_require_login', false );
     $bubble_position    = SSC_Settings::get_option( 'ssc_bubble_position', 'bottom-right' );
     $primary_color      = SSC_Settings::get_option( 'ssc_primary_color', '#0073aa' );
 
@@ -169,6 +170,7 @@ function ssc_enqueue_frontend_assets() {
         'trigger_icon'       => ! empty( $customizer['trigger_icon'] ) ? $customizer['trigger_icon'] : 'chat',
         'trigger_icon_image' => ! empty( $customizer['trigger_icon_image'] ) ? esc_url( $customizer['trigger_icon_image'] ) : '',
         'ultra_ajax'         => $ultra_ajax_active,
+        'require_login'      => (bool) $require_login,
         'is_logged_in'       => is_user_logged_in(),
         'login_url'          => wp_login_url(),
         'register_url'       => wp_registration_url(),

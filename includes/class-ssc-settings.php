@@ -33,6 +33,14 @@ if ( ! class_exists( 'SSC_Settings' ) ) {
 
             return $default;
         }
+
+        /**
+         * Clear the cached options array so the next get_option() re-reads
+         * from the database. Call after updating ssc_options mid-request.
+         */
+        public static function flush_cache() {
+            self::$options_cache = null;
+        }
     }
 
 }

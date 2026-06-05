@@ -40,6 +40,12 @@
     }
 
     var config = ssc_config;
+
+    // When the Require Login setting is on and the visitor is anonymous, the
+    // widget renders a login invitation instead of the input area and never
+    // starts a session — the server rejects anonymous requests anyway.
+    var requireLogin = !!config.require_login && !config.is_logged_in;
+
     var state = {
         open: false,
         conversationId: 0,
@@ -58,6 +64,7 @@
         unreadCount: 0,
         emailProvided: false,
         sessionStarted: false,
+        welcomeShown: false,
         timeoutTriggered: false,
         firstVisitorMessageAt: 0,
         sounds: {}
@@ -115,6 +122,21 @@
         headerHtml += '<button class="ssc-header-close" id="ssc-header-close" aria-label="Close chat"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>';
         headerHtml += '</div>';
 
+        var inputAreaHtml;
+        if (requireLogin) {
+            inputAreaHtml =
+                '<div class="ssc-login-required">' +
+                    '<a href="' + escapeAttr(config.login_url || '/wp-login.php') + '">Log in</a> or <a href="' + escapeAttr(config.register_url || '/wp-login.php?action=register') + '">create an account</a> to start chatting.' +
+                '</div>';
+        } else {
+            inputAreaHtml =
+                '<div class="ssc-input-area">' +
+                    '<input type="text" id="ssc-hp-field" name="website_url" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" />' +
+                    '<textarea id="ssc-input" rows="2" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
+                    '<button class="ssc-send-btn" id="ssc-send-btn">Send</button>' +
+                '</div>';
+        }
+
         widget.innerHTML =
             headerHtml +
             '<div class="ssc-messages" id="ssc-messages"><div class="ssc-scroll-anchor"></div></div>' +
@@ -128,12 +150,8 @@
             '<div class="ssc-login-prompt" id="ssc-login-prompt">' +
                 '<a href="' + (config.login_url || '/wp-login.php') + '">Log in</a> or <a href="' + (config.register_url || '/wp-login.php?action=register') + '">create an account</a> to save your chat history.' +
             '</div>' +
-            '<div class="ssc-input-area">' +
-                '<input type="text" id="ssc-hp-field" name="website_url" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" />' +
-                '<textarea id="ssc-input" rows="2" placeholder="Type a message..." maxlength="' + (config.max_message_length || 500) + '"></textarea>' +
-                '<button class="ssc-send-btn" id="ssc-send-btn">Send</button>' +
-            '</div>' +
-            '<div class="ssc-sponsor-link"><a href="https://www.superspeedyplugins.com/get-super-speedy-chat" target="_blank" rel="noopener">Get your own Super Speedy Chat <span>FREE!</span></a></div>';
+            inputAreaHtml +
+            '<div class="ssc-sponsor-link"><a href="https://www.superspeedyplugins.com/get-super-speedy-chat" target="_blank" rel="noopener">Powered by Super Speedy Chat</a></div>';
 
         wrapper.appendChild(trigger);
         wrapper.appendChild(widget);
@@ -142,13 +160,15 @@
         // Event listeners
         trigger.addEventListener('click', toggleChat);
         document.getElementById('ssc-header-close').addEventListener('click', closeChat);
-        document.getElementById('ssc-send-btn').addEventListener('click', sendMessage);
-        document.getElementById('ssc-input').addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
+        if (!requireLogin) {
+            document.getElementById('ssc-send-btn').addEventListener('click', sendMessage);
+            document.getElementById('ssc-input').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
         document.getElementById('ssc-email-submit').addEventListener('click', submitEmail);
         document.getElementById('ssc-email-input').addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
@@ -164,11 +184,13 @@
         });
 
         // Auto-grow textarea
-        document.getElementById('ssc-input').addEventListener('input', function () {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 80) + 'px';
-            resetIdle();
-        });
+        if (!requireLogin) {
+            document.getElementById('ssc-input').addEventListener('input', function () {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+                resetIdle();
+            });
+        }
 
         // Resize widget when virtual keyboard opens/closes on mobile
         if (window.visualViewport) {
@@ -250,6 +272,20 @@
         // Clear unread.
         state.unreadCount = 0;
         updateBadge();
+
+        // With Require Login on, anonymous visitors get no session or polling —
+        // just the welcome message above the login invitation.
+        if (requireLogin) {
+            if (!state.welcomeShown) {
+                state.welcomeShown = true;
+                var welcome = window.ssc.hooks.applyFilters('ssc.bubble.welcomeMessage', config.welcome_message || '');
+                if (welcome) {
+                    appendSystemMessage(welcome, 'ssc-welcome');
+                }
+            }
+            window.ssc.hooks.doAction('ssc.bubble.opened', state);
+            return;
+        }
 
         // Start session if needed.
         if (!state.sessionStarted) {

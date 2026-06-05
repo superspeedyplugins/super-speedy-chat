@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.08
+Stable tag: 1.09
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,13 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.09 (5th June 2026) =
+* The "Require login to chat" setting is now actually enforced. Previously the checkbox existed but had no effect; now, when enabled, all visitor endpoints (session/send/poll/email/auto-reply) return 401 for anonymous visitors, and the chat widget replaces the message input with a log in / create account invitation. Conversations from logged-in users are linked to their account as before.
+* With Require Login enabled, chat requests route through the standard REST API instead of the Ultra Ajax fast path (mu-plugin updated to 1.2.0), since they need real WordPress authentication. Anonymous-friendly sites are unaffected.
+* Added `SSC_Settings::flush_cache()` for re-reading options mid-request.
+* The widget footer link no longer claims the plugin is free ("Powered by Super Speedy Chat").
+* New regression test: tests/test-require-login.php.
 
 = 1.08 (27th May 2026) =
 * Introduced the add-on extension API (`SSC_ADDON_API_VERSION = 1.0`) — channel integrations can now ship as separate plugins (WhatsApp, Slack, Telegram, etc.) and plug into core via hooks instead of patching it

@@ -443,6 +443,26 @@
     text-decoration: underline;
 }
 
+/* Login required (Require Login setting on, visitor anonymous) — replaces the input area */
+.ssc-login-required {
+    padding: 16px;
+    background: #eef7ff;
+    border-top: 1px solid var(--ssc-border);
+    font-size: 14px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.ssc-login-required a {
+    color: var(--ssc-primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.ssc-login-required a:hover {
+    text-decoration: underline;
+}
+
 /* Powered by / branding */
 .ssc-powered {
     text-align: center;
