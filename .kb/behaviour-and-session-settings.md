@@ -53,9 +53,11 @@ Sounds play for both visitors (incoming replies) and admins (new waiting convers
 
 ## Require Login
 
-When ticked, only logged-in WordPress users can chat. Off by default (chat is anonymous).
+When ticked, only logged-in WordPress users can chat. Off by default (chat is anonymous). Logged-out visitors see a **log in / create an account** invitation in place of the message box, and the server refuses any chat request that doesn't come from a logged-in user.
 
 Turn this on for membership sites, internal/staff chat, or to cut spam. With login required, conversations are automatically linked to the user's account and their display name is used. Pair it sensibly with the **Prompt Login After** setting — if login is required, the soft prompt is redundant.
+
+One technical note: authenticated requests need full WordPress to check who's logged in, so with Require Login on, chat requests go through the standard REST API instead of the Ultra Ajax fast path. Chat stays quick — it just doesn't get the extra mu-plugin speed-up while this setting is on.
 
 ## How these relate to sessions
 

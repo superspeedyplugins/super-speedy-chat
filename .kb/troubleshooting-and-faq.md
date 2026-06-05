@@ -64,7 +64,7 @@ Lengthen the polling intervals on the **Behaviour** tab, and make sure Ultra Aja
 ## FAQ
 
 **Do visitors have to log in to chat?**
-No. Chat is anonymous by default. You can require login on the **Behaviour** tab if you prefer.
+No. Chat is anonymous by default. You can require login on the **Behaviour** tab if you prefer — logged-out visitors then see a log in / create account invitation instead of the message box.
 
 **Does it need a third-party service?**
 No. Core chat runs entirely on your server. OpenAI/Anthropic and Discord are optional add-on integrations.

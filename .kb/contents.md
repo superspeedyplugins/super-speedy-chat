@@ -2,7 +2,7 @@
 
 An index of every knowledge-base guide for Super Speedy Chat, organised by the KB category **term** it belongs under, with the publication status of each article, plus a list of suggested articles still to write.
 
-**Status audit last run: 2026-06-05** (local `.kb/` files were content-diffed against the live site via the REST API).
+**Status audit last run: 2026-06-05** (local `.kb/` files were content-diffed against the live site via the REST API). Same day: the 5 gap articles were written and uploaded as drafts, the Require Login feature was implemented in v1.09 (clearing the two publish blockers), quick-start was reconciled both ways, and what-is got a local source file.
 
 ## Status legend
 
@@ -31,13 +31,15 @@ KB articles are filed two levels deep: the plugin parent term (`super-speedy-cha
 
 | Article | File | Status | Audience | Covers |
 |---|---|---|---|---|
-| What is Super Speedy Chat? | **no local file** | **live** (id 1692050) ⚠ | Site owner | Product overview. **Lives only on the site — there is no `.kb/` source file.** Pull it down into `.kb/what-is-super-speedy-chat.md` so it has a source of truth. |
-| Quick Start Guide | `.kb/quick-start-guide.md` | **live** (id 1692233) ⚠ **changed** | Site owner | Install/activate, verify the bubble, test message, reply from wp-admin, settings overview. **Live copy was edited 2026-06-03 and is newer than the local file** — it correctly dropped the false "Option A: install from the WordPress Plugin Directory" path (paid plugin, not on wp.org). Update the local file from live before any local edit. |
+| What is Super Speedy Chat? | `.kb/what-is-super-speedy-chat.md` | **live** (id 1692050) | Site owner | Product overview: key features, who it's for, how it works. Local source created 2026-06-05 from the live copy. |
+| Quick Start Guide | `.kb/quick-start-guide.md` | **live** (id 1692233) | Site owner | Install/activate (ZIP upload — paid plugin, not on wp.org), verify the bubble, test message, reply from wp-admin, settings overview. Reconciled 2026-06-05: local synced to live, and live got back its lost intro + "1. Install and Activate" heading plus a fixed further-reading link (was a broken relative `.md` href). |
+| Installing Your License, Activation and Updates | `.kb/installing-your-license-activation-and-updates.md` | **live** (id 1692590) | Site owner | Entering the key on the Super Speedy settings page, Recheck Licenses, license statuses (active/expired/exceeded), how updates are delivered, expiry consequences. |
+| Team Roles and Permissions | `.kb/team-roles-and-permissions.md` | **live** (id 1692591) | Site owner | wp-admin chat needs `manage_options` (Administrator); Discord as the no-WordPress-account route for support staff; display names; no dedicated chat-agent role yet. |
 | Managing Conversations | `.kb/managing-conversations.md` | **live** (id 1692234) | Site owner | The Chats inbox: filters, assignment, detail view, statuses, saving canned responses. |
 | Customizing the Chat Widget Appearance | `.kb/customizing-appearance.md` | **live** (id 1692235) ⚠ *re-file: Configuration → Getting Started* | Site owner | Customizer: header image/title, colours, position, trigger icon. |
 | Email Notifications | `.kb/email-notifications.md` | **live** (id 1692236) ⚠ *re-file: Configuration → Getting Started* | Site owner | Admin + visitor notifications, the email-collection prompt, SMTP tips. |
-| Behaviour and Session Settings | `.kb/behaviour-and-session-settings.md` | **draft** (id 1692468) ⚠ *blocker, see note* | Site owner | Timeout/action, login prompt, max length, poll intervals, sounds, require-login. **Do not publish as-is:** it documents **Require Login** as a working feature, but the `ssc_require_login` setting is registered yet never enforced anywhere in the code (verified 2026-06-05). Either implement enforcement first or rewrite that section (only the login *prompt* after N messages actually works). |
-| Display Names | `.kb/display-names.md` | **draft** (id 1692469) | Site owner | Shared vs individual mode, per-user chat name, how it appears (incl. Discord). |
+| Behaviour and Session Settings | `.kb/behaviour-and-session-settings.md` | **live** (id 1692468) | Site owner | Timeout/action, login prompt, max length, poll intervals, sounds, require-login. *Former publish blocker cleared 2026-06-05: Require Login enforcement shipped in v1.09 and the article now documents the real behaviour (401s, login invitation in the widget, REST fall-through instead of Ultra Ajax).* |
+| Display Names | `.kb/display-names.md` | **live** (id 1692469) | Site owner | Shared vs individual mode, per-user chat name, how it appears (incl. Discord). |
 | Discord Integration Setup Guide | `.kb/discord-integration-setup.md` | **live** (id 1691994) | Site owner | Connecting Discord: bot token, channel ID, companion bot. |
 
 ### Features
@@ -46,32 +48,33 @@ KB articles are filed two levels deep: the plugin parent term (`super-speedy-cha
 |---|---|---|---|---|
 | Canned Responses | `.kb/canned-responses.md` | **live** (id 1692237) ⚠ *re-file: Automation → Features* | Site owner | Saving/managing canned responses and how they feed the classifier. |
 | LLM Auto-Reply Setup Guide | `.kb/llm-auto-reply-setup.md` | **live** (id 1692238) ⚠ *re-file: Automation → Features* | Site owner | OpenAI/Anthropic config, timeout action, how it works, cost, troubleshooting. |
-| Discord Integration: Chat With Visitors From Discord | `.kb/discord-integration.md` | **draft** (id 1692470) | Site owner | Feature overview — what the Discord bridge does and why to use it. |
+| Discord Integration: Chat With Visitors From Discord | `.kb/discord-integration.md` | **live** (id 1692470) | Site owner | Feature overview — what the Discord bridge does and why to use it. |
 
 ### Advanced
 
 | Article | File | Status | Audience | Covers |
 |---|---|---|---|---|
 | Ultra Ajax Performance Guide | `.kb/ultra-ajax-performance.md` | **live** (id 1692239) ⚠ *re-file: Performance → Advanced* | Site owner / advanced | The mu-plugin: install/auto-update, verifying, polling, rate limits, troubleshooting. |
-| Privacy and Data Handling | `.kb/privacy-and-data-handling.md` | **draft** (id 1692471) | Site owner | What's stored, the cookie, what leaves your server, retention, uninstall, GDPR checklist. |
-| Troubleshooting and FAQ | `.kb/troubleshooting-and-faq.md` | **draft** (id 1692472) ⚠ *blocker, see note* | Site owner | Consolidated first-stop fixes + frequently asked questions. **Do not publish as-is:** the "can I make visitors log in?" answer claims you can require login on the Behaviour tab — that setting is unenforced in code (same blocker as Behaviour and Session Settings). |
+| Privacy and Data Handling | `.kb/privacy-and-data-handling.md` | **live** (id 1692471) | Site owner | What's stored, the cookie, what leaves your server, retention, uninstall, GDPR checklist. |
+| Troubleshooting and FAQ | `.kb/troubleshooting-and-faq.md` | **live** (id 1692472) | Site owner | Consolidated first-stop fixes + frequently asked questions. *Former publish blocker cleared 2026-06-05: Require Login is now enforced (v1.09) and the FAQ answer matches the real behaviour.* |
+| Showing or Hiding the Chat on Specific Pages | `.kb/showing-or-hiding-the-chat-on-specific-pages.md` | **live** (id 1692592) | Site owner / advanced | Conditional dequeue snippets (checkout, by page, show-only-on), CSS-only fallback, global Enable Chat toggle. |
+| Backing Up and Migrating Chat Data | `.kb/backing-up-and-migrating-chat-data.md` | **live** (id 1692593) | Site owner / advanced | The five `ssc_*` tables + options, what backup/migration tools do and don't carry, delete-plugin-drops-tables warning, targeted mysqldump, migration steps. |
 
 ### Developers
 
 | Article | File | Status | Audience | Covers |
 |---|---|---|---|---|
-| Architecture Overview | `.kb/architecture-overview.md` | **draft** (id 1692473) | Developer | Component map, design decisions, per-component internals, message lifecycle. |
-| Developer Guide: Hooks and Building Channel Add-ons | `.kb/developer-hooks-and-add-ons.md` | **draft** (id 1692474) | Developer | Lifecycle actions, registration hooks, inbound helpers, the add-on registry. |
-| REST API Reference | `.kb/rest-api-reference.md` | **draft** (id 1692475) | Developer | `ssc/v1` endpoints, auth model, rate limits, request/response shapes. |
-| Discord Companion Bot: Running It in Production | `.kb/discord-companion-bot-operations.md` | **draft** (id 1692476) | Developer / admin | Deploying the Node relay bot (PM2/systemd), updating, secret rotation, troubleshooting. |
+| Architecture Overview | `.kb/architecture-overview.md` | **live** (id 1692473) | Developer | Component map, design decisions, per-component internals, message lifecycle. |
+| Developer Guide: Hooks and Building Channel Add-ons | `.kb/developer-hooks-and-add-ons.md` | **live** (id 1692474) | Developer | Lifecycle actions, registration hooks, inbound helpers, the add-on registry. |
+| REST API Reference | `.kb/rest-api-reference.md` | **live** (id 1692475) | Developer | `ssc/v1` endpoints, auth model, rate limits, request/response shapes. |
+| Discord Companion Bot: Running It in Production | `.kb/discord-companion-bot-operations.md` | **live** (id 1692476) | Developer / admin | Deploying the Node relay bot (PM2/systemd), updating, secret rotation, troubleshooting. |
+| Widget Styling Reference (Custom CSS) | `.kb/widget-styling-reference.md` | **live** (id 1692594) | Developer | CSS custom properties, stable selector table, the inline-style colour gotcha (Customizer colours beat `:root` overrides), mobile note. |
 
-## Publish checklist (state as of 2026-06-05)
+## Publish checklist (state as of 2026-06-05, end of day)
 
-- **8 live** and in sync: managing-conversations, customizing-appearance, email-notifications, canned-responses, llm-auto-reply-setup, ultra-ajax-performance, discord-integration-setup, what-is-super-speedy-chat (live-only — needs a local source file).
-- **1 live but drifted**: quick-start-guide — live is newer; sync local from live.
-- **9 drafts awaiting publish**: behaviour-and-session-settings ⚠, display-names, discord-integration, privacy-and-data-handling, troubleshooting-and-faq ⚠, architecture-overview, developer-hooks-and-add-ons, rest-api-reference, discord-companion-bot-operations. The two ⚠ ones must have their Require Login sections fixed (or the feature implemented) first.
-- **0 local-only** articles — everything written has been uploaded at least as a draft.
-- **Re-file on next touch**: the five live articles sitting in legacy Configuration/Automation/Performance terms.
+- **All 23 articles are live** and in sync with their local source files. The remaining 14 drafts were published on 2026-06-05 after v1.09 (Require Login enforcement) was committed, so every article describes shipped behaviour.
+- **0 drafts, 0 local-only, 0 unwritten gaps** from the customer/developer review.
+- **Re-file on next touch**: the five live articles sitting in legacy Configuration/Automation/Performance terms (Customizing Appearance, Email Notifications → Getting Started; Canned Responses, LLM Auto-Reply → Features; Ultra Ajax Performance → Advanced).
 
 ## Related files in `.docs/` (specs, not KB articles)
 
@@ -88,28 +91,15 @@ KB articles are filed two levels deep: the plugin parent term (`super-speedy-cha
 
 ## Pending / suggested articles (all **unwritten**)
 
-Candidates worth adding, with their intended term. The first block came out of a customer/developer gap review (2026-06-05) — things a paying customer or integrating developer will look for and not find.
+Candidates worth adding, with their intended term.
 
-### Gaps found 2026-06-05 — customer perspective
-
-| Suggested article | Term | Why |
-|---|---|---|
-| **Installing Your License, Activation & Updates** | Getting Started | **Biggest gap for a paid plugin.** Nothing documents the post-purchase flow: downloading the zip, entering the licence key on the Super Speedy Settings page, the "Recheck Licenses" button after a renewal/upgrade, what happens when a licence expires, and how plugin updates are delivered. Every buyer hits this before anything else in the KB. |
-| **Team Roles & Permissions** | Getting Started | Replying, viewing the inbox and assignment all require the `manage_options` capability (admin-only) — verified in `class-ssc-rest.php`. Customers with support staff will ask "how do I let my agent reply without giving them full admin?" Document the current constraint honestly (and revisit if a chat-agent capability/role is added). |
-| **Showing or Hiding the Chat on Specific Pages** | Advanced | There is no built-in per-page display setting. A very common ask ("hide it on checkout", "only show on the shop"). Document the supported approaches (conditional dequeue of the widget assets / `ssc_frontend_config` filter) with copy-paste snippets. |
-| **Backing Up & Migrating Chat Data** | Advanced | Conversations live in custom `ssc_*` tables. Site-migration and backup tools that only handle core tables will silently drop chat history; uninstall drops the tables entirely (`uninstall.php`). Customers should know this *before* it bites them. |
-
-### Gaps found 2026-06-05 — developer perspective
-
-| Suggested article | Term | Why |
-|---|---|---|
-| **Widget Styling Reference (Custom CSS)** | Developers | The Customizer covers colours/position/icon only. Developers wanting deeper restyling need a reference of the widget's stable CSS classes (`ssc-*`) and guidance on safe overrides vs. things that may change between versions. |
+*The five gap articles identified in the 2026-06-05 customer/developer review (License Activation & Updates, Team Roles & Permissions, Show/Hide on Specific Pages, Backing Up & Migrating Chat Data, Widget Styling Reference) have been written and uploaded as drafts — see the term tables above.*
 
 ### Previously identified (still valid)
 
 | Suggested article | Term | Why |
 |---|---|---|
-| Spam & Abuse Prevention | Advanced | Pull together the honeypot, per-IP rate limits, login prompt, and LLM daily cap into one "harden your chat" guide. *(Drop "require-login" from the outline unless the setting gets enforced.)* |
+| Spam & Abuse Prevention | Advanced | Pull together the honeypot, per-IP rate limits, login prompt, Require Login (enforced as of v1.09), and LLM daily cap into one "harden your chat" guide. |
 | Caching & CDN Compatibility | Advanced | How to exclude `/wp-json/ssc/` from page/edge caches; why a cached config breaks the bubble. A very common support theme. |
 | Multisite Setup | Advanced | Behaviour of the network-wide Ultra Ajax mu-plugin and per-site enablement. |
 | Migrating From Another Chat Plugin | Getting Started | Switching from Tidio/Crisp/etc. — what carries over, what doesn't. |
