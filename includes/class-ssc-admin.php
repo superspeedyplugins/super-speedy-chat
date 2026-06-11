@@ -702,21 +702,44 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
         // -------------------------------------------------------------------
 
         public function sanitize_options( $input ) {
-            $sanitized = array();
-            if ( ! is_array( $input ) ) {
-                return $sanitized;
+            $existing = get_option( 'ssc_options', array() );
+            if ( ! is_array( $existing ) ) {
+                $existing = array();
             }
+            if ( ! is_array( $input ) ) {
+                return $existing;
+            }
+
+            // Start from what's already saved so partial updates (e.g. Discord
+            // lazily writing its webhook secret via update_option) don't wipe
+            // unrelated keys. Without this, a partial save zeros every number
+            // field — including ssc_max_message_length, which then ships to
+            // the front-end as maxlength="0" and silently blocks all typing.
+            $sanitized = $existing;
+
+            // Distinguish a real Settings-form submission from a programmatic
+            // update_option() call. On a form submit, unchecked checkboxes are
+            // absent from $_POST entirely, so we must coerce missing checkbox
+            // keys to false. Programmatic callers don't have that quirk and
+            // their missing keys should be preserved as-is.
+            $is_form_submit = isset( $_POST['option_page'] ) && 'ssc_option_group' === $_POST['option_page'];
 
             // Checkboxes.
             $cb_keys = array( 'ssc_enabled', 'ssc_mu_enabled', 'ssc_play_sounds', 'ssc_require_login', 'ssc_admin_email_enabled', 'ssc_visitor_email_enabled' );
             foreach ( $cb_keys as $k ) {
-                $sanitized[ $k ] = ! empty( $input[ $k ] );
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = ! empty( $input[ $k ] );
+                } elseif ( $is_form_submit ) {
+                    $sanitized[ $k ] = false;
+                }
             }
 
             // Text.
             $text_keys = array( 'ssc_shared_display_name', 'ssc_admin_email', 'ssc_email_from_name', 'ssc_llm_api_key', 'ssc_llm_model' );
             foreach ( $text_keys as $k ) {
-                $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_text_field( $input[ $k ] ) : '';
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = sanitize_text_field( $input[ $k ] );
+                }
             }
 
             // Textarea.
@@ -734,19 +757,25 @@ if ( ! class_exists( 'SSC_Admin' ) ) {
                 'ssc_llm_provider'        => array( '', 'openai', 'anthropic' ),
             );
             foreach ( $select_allowed as $k => $allowed ) {
-                $sanitized[ $k ] = ( isset( $input[ $k ] ) && in_array( $input[ $k ], $allowed, true ) ) ? $input[ $k ] : $allowed[0];
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = in_array( $input[ $k ], $allowed, true ) ? $input[ $k ] : $allowed[0];
+                }
             }
 
             // Sound selects (sanitize as filenames).
             $sound_keys = array( 'ssc_sound_message', 'ssc_sound_open' );
             foreach ( $sound_keys as $k ) {
-                $sanitized[ $k ] = isset( $input[ $k ] ) ? sanitize_file_name( $input[ $k ] ) : '';
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = sanitize_file_name( $input[ $k ] );
+                }
             }
 
             // Numbers.
             $num_keys = array( 'ssc_admin_timeout', 'ssc_login_prompt_after', 'ssc_max_message_length', 'ssc_poll_interval', 'ssc_idle_poll_interval', 'ssc_deep_idle_poll_interval', 'ssc_sound_volume' );
             foreach ( $num_keys as $k ) {
-                $sanitized[ $k ] = isset( $input[ $k ] ) ? absint( $input[ $k ] ) : 0;
+                if ( isset( $input[ $k ] ) ) {
+                    $sanitized[ $k ] = absint( $input[ $k ] );
+                }
             }
 
             // Save per-user display name (submitted outside ssc_options but alongside it).
