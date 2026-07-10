@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.10.1
+Stable tag: 1.10.2
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,9 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.10.2 (10th July 2026) =
+* Updated super-speedy-settings (shared across all Super Speedy plugins): re-enabled TLS certificate verification on the licence/update check, escaped all dynamic output in the admin licence table, and added a capability check to the licence recheck handler.
 
 = 1.10.1 (10th July 2026) =
 * Updated super-speedy-settings: re-enabled TLS certificate verification on the licence/update check (it previously accepted any certificate, so a network attacker could spoof the licence server or intercept the key). This lives in the shared Super Speedy Settings framework, so it applies to every Super Speedy plugin.
