@@ -483,12 +483,15 @@ if ( ! class_exists( 'SSC_Chat' ) ) {
             }
 
             // Fire the appropriate inbound lifecycle hook so other listeners
-            // (analytics, notifications, mirroring add-ons) can react.
+            // (analytics, notifications, mirroring add-ons) can react. The 5th
+            // arg is the source channel slug so a channel add-on can skip
+            // echoing a reply back to the channel it came from.
             $conversation = SSC_DB::get_conversation( $conversation_id );
+            $source_channel = sanitize_key( $args['channel'] );
             if ( $author_type === 'visitor' ) {
-                do_action( 'ssc_visitor_message_sent', $message_id, $conversation, $message_text, $participant );
+                do_action( 'ssc_visitor_message_sent', $message_id, $conversation, $message_text, $participant, $source_channel );
             } elseif ( $author_type === 'admin' ) {
-                do_action( 'ssc_admin_reply_sent', $message_id, $conversation, $message_text, null );
+                do_action( 'ssc_admin_reply_sent', $message_id, $conversation, $message_text, null, $source_channel );
             } else {
                 do_action( 'ssc_bot_message_sent', $message_id, $conversation, $message_text, 'text' );
             }

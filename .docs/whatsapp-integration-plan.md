@@ -1,6 +1,10 @@
 # WhatsApp Integration — Build Plan
 
-Status: **proposal / for review**. Not yet implemented.
+Status: **implemented in 1.11.0** (22 Jul 2026) — both Mode A and Mode B were
+built (Dave wanted visitors to choose their channel AND instant forwarding to
+his personal WhatsApp because Discord phone notifications lag ~10 minutes).
+Implementation lives in `includes/class-ssc-whatsapp.php` on the channel
+add-on API; user-facing setup guide: `whatsapp-integration-setup.md`.
 
 This doc proposes how to add WhatsApp to Super Speedy Chat. It mirrors the existing Discord integration where the pattern transfers cleanly and calls out the places where WhatsApp forces a different design.
 

@@ -7,7 +7,7 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
     class SSC_DB {
 
-        const DB_VERSION = '4.0.0';
+        const DB_VERSION = '4.1.0';
 
         /**
          * Get the full table name with prefix.
@@ -33,6 +33,8 @@ if ( ! class_exists( 'SSC_DB' ) ) {
 
             $canned_table = self::table( 'ssc_canned_responses' );
             $discord_table = self::table( 'ssc_discord_threads' );
+            $whatsapp_table = self::table( 'ssc_whatsapp_threads' );
+            $whatsapp_map_table = self::table( 'ssc_whatsapp_msg_map' );
 
             $sql = "CREATE TABLE {$conversations_table} (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -110,6 +112,30 @@ if ( ! class_exists( 'SSC_DB' ) ) {
                 PRIMARY KEY  (id),
                 UNIQUE INDEX idx_conversation (conversation_id),
                 INDEX idx_thread (discord_thread_id)
+            ) {$charset_collate};
+
+            CREATE TABLE {$whatsapp_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                conversation_id BIGINT UNSIGNED NOT NULL,
+                wa_phone_number VARCHAR(20) NOT NULL,
+                wa_profile_name VARCHAR(100) NOT NULL DEFAULT '',
+                last_inbound_at DATETIME NULL,
+                last_outbound_at DATETIME NULL,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE INDEX idx_wa_conversation (conversation_id),
+                UNIQUE INDEX idx_wa_phone (wa_phone_number)
+            ) {$charset_collate};
+
+            CREATE TABLE {$whatsapp_map_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                wa_msg_id VARCHAR(128) NOT NULL,
+                conversation_id BIGINT UNSIGNED NOT NULL,
+                direction ENUM('in','out') NOT NULL DEFAULT 'out',
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE INDEX idx_wa_msg (wa_msg_id),
+                INDEX idx_wa_map_conv (conversation_id)
             ) {$charset_collate};";
 
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';

@@ -501,3 +501,32 @@
     margin-left: 8px;
     font-weight: 600;
 }
+
+/* WhatsApp test */
+#ssc-whatsapp-test-result {
+    margin-left: 8px;
+    font-weight: 600;
+}
+
+/* Channel badges (conversation list) */
+.ssc-channel-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+    background: #e5e5e5;
+    color: #444;
+}
+
+.ssc-channel-whatsapp {
+    background: #d9f4e2;
+    color: #128c4b;
+}
+
+.ssc-channel-discord {
+    background: #e3e6fd;
+    color: #4d5bd3;
+}

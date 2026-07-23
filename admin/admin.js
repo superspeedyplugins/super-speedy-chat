@@ -209,8 +209,11 @@
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             var assignedName = item.assigned_to ? (adminNameMap[item.assigned_to] || 'Admin #' + item.assigned_to) : '—';
+            var channelBadge = (item.channel && item.channel !== 'website')
+                ? ' <span class="ssc-channel-badge ssc-channel-' + esc(item.channel) + '">' + esc(item.channel) + '</span>'
+                : '';
             var row = '<tr class="ssc-conversation-row" data-id="' + item.id + '">' +
-                '<td class="ssc-col-visitor"><strong>' + esc(item.visitor_name) + '</strong>' +
+                '<td class="ssc-col-visitor"><strong>' + esc(item.visitor_name) + '</strong>' + channelBadge +
                     (item.visitor_email ? '<br><small>' + esc(item.visitor_email) + '</small>' : '') +
                 '</td>' +
                 '<td class="ssc-col-message">' + esc(item.last_message_preview || '—') + '</td>' +
@@ -635,6 +638,29 @@
         }, function () {
             $btn.prop('disabled', false);
             $result.text('Connection failed. Check your bot token.').css('color', 'red');
+        });
+    });
+
+    // ---------------------------------------------------------------
+    // WhatsApp Test Connection
+    // ---------------------------------------------------------------
+
+    $(document).on('click', '#ssc-whatsapp-test', function () {
+        var $btn = $(this);
+        var $result = $('#ssc-whatsapp-test-result');
+        $btn.prop('disabled', true);
+        $result.text('Testing...').css('color', '');
+
+        apiPost('admin/whatsapp/test', {}, function (data) {
+            $btn.prop('disabled', false);
+            if (data.success) {
+                $result.text('Connected! ' + data.name + ' (' + data.phone + ')').css('color', 'green');
+            } else {
+                $result.text('Failed: ' + (data.message || 'Unknown error')).css('color', 'red');
+            }
+        }, function () {
+            $btn.prop('disabled', false);
+            $result.text('Connection failed. Check your access token and phone number ID.').css('color', 'red');
         });
     });
 

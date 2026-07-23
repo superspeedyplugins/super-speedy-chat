@@ -37,7 +37,7 @@ if ( ! class_exists( 'SSC_Discord' ) ) {
 
             // Message lifecycle listeners.
             add_action( 'ssc_visitor_message_sent', array( __CLASS__, 'on_visitor_message_sent' ), 10, 4 );
-            add_action( 'ssc_admin_reply_sent',     array( __CLASS__, 'on_admin_reply_sent' ),     10, 4 );
+            add_action( 'ssc_admin_reply_sent',     array( __CLASS__, 'on_admin_reply_sent' ),     10, 5 );
 
             // Self-register with the add-on system so the Status tab shows us.
             if ( class_exists( 'SSC_Addons' ) ) {
@@ -269,16 +269,26 @@ if ( ! class_exists( 'SSC_Discord' ) ) {
             self::push_message( $conversation->id, $sender, $message_text, true );
         }
 
-        public static function on_admin_reply_sent( $message_id, $conversation, $message_text, $admin_user_id ) {
+        public static function on_admin_reply_sent( $message_id, $conversation, $message_text, $admin_user_id, $source_channel = '' ) {
             if ( ! self::is_enabled() ) {
                 return;
             }
-            // Admin replies originating from Discord set $admin_user_id to null —
-            // skip those to avoid echoing back to the same Discord thread.
-            if ( empty( $admin_user_id ) ) {
+            // Skip replies that originated from Discord itself (would echo back
+            // to the same thread). Replies relayed by another channel add-on
+            // (e.g. WhatsApp) carry that channel's slug and DO get mirrored so
+            // the Discord thread keeps the full history. The empty-source +
+            // null-admin fallback covers add-ons that don't pass a channel.
+            if ( $source_channel === 'discord' ) {
                 return;
             }
-            $admin_name = class_exists( 'SSC_Admin' ) ? SSC_Admin::get_admin_chat_name( $admin_user_id ) : 'Admin';
+            if ( empty( $source_channel ) && empty( $admin_user_id ) ) {
+                return;
+            }
+            if ( $admin_user_id ) {
+                $admin_name = class_exists( 'SSC_Admin' ) ? SSC_Admin::get_admin_chat_name( $admin_user_id ) : 'Admin';
+            } else {
+                $admin_name = 'Admin (' . ucfirst( $source_channel ) . ')';
+            }
             self::push_message( $conversation->id, $admin_name, $message_text, false );
         }
 
@@ -288,6 +298,10 @@ if ( ! class_exists( 'SSC_Discord' ) ) {
 
         /**
          * Handle an incoming message from the Discord bot relay.
+         *
+         * Routed through SSC_Chat::external_inbound so the ssc_admin_reply_sent
+         * hook fires (with source channel 'discord') and other channel add-ons
+         * can relay the reply onwards (e.g. to a WhatsApp visitor).
          */
         public static function handle_incoming( $discord_thread_id, $author_name, $message_text ) {
             global $wpdb;
@@ -301,68 +315,12 @@ if ( ! class_exists( 'SSC_Discord' ) ) {
                 return null;
             }
 
-            $participant = self::get_or_create_discord_participant(
-                $thread->conversation_id,
-                $author_name
-            );
-
-            if ( ! $participant ) {
-                return null;
-            }
-
-            $message_id = SSC_DB::add_message( array(
+            return SSC_Chat::external_inbound( array(
                 'conversation_id' => $thread->conversation_id,
-                'participant_id'  => $participant->id,
-                'message'         => sanitize_text_field( $message_text ),
-                'message_type'    => 'text',
-            ) );
-
-            // Set conversation back to 'active' since admin replied.
-            $conversation = SSC_DB::get_conversation( $thread->conversation_id );
-            $old_status   = $conversation ? $conversation->status : null;
-            SSC_DB::update_conversation( $thread->conversation_id, array(
-                'status' => 'active',
-            ) );
-            if ( $old_status && $old_status !== 'active' ) {
-                do_action( 'ssc_conversation_status_changed', $thread->conversation_id, 'active', $old_status );
-            }
-
-            return $message_id;
-        }
-
-        // -------------------------------------------------------------------
-        // Participant Management
-        // -------------------------------------------------------------------
-
-        /**
-         * Find or create an admin participant for a Discord user in a conversation.
-         */
-        private static function get_or_create_discord_participant( $conversation_id, $display_name ) {
-            global $wpdb;
-            $table = $wpdb->prefix . 'ssc_participants';
-
-            $existing = $wpdb->get_row( $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE conversation_id = %d AND participant_type = 'admin' AND display_name = %s LIMIT 1",
-                $conversation_id,
-                $display_name
-            ) );
-
-            if ( $existing ) {
-                return $existing;
-            }
-
-            $now = current_time( 'mysql' );
-            $wpdb->insert( $table, array(
-                'conversation_id'  => $conversation_id,
-                'participant_type' => 'admin',
-                'user_id'          => null,
-                'visitor_hash'     => null,
-                'display_name'     => $display_name,
-                'joined_at'        => $now,
-            ) );
-
-            return $wpdb->get_row( $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE id = %d", $wpdb->insert_id
+                'channel'         => 'discord',
+                'author_name'     => $author_name,
+                'author_type'     => 'admin',
+                'message'         => $message_text,
             ) );
         }
 

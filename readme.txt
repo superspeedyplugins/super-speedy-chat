@@ -4,7 +4,7 @@ Donate link: https://www.superspeedyplugins.com/
 Tags: live chat, chat, customer support, discord, fast ajax
 Requires at least: 4.7
 Tested up to: 6.7
-Stable tag: 1.10.5
+Stable tag: 1.11.0
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,6 +35,15 @@ Super Speedy Chat is a live chat system for WordPress where visitors chat with s
 Yes, and it's MySQL 8, MariaDB and Percona DB compatible too.
 
 == Changelog ==
+
+= 1.11.0 (22nd July 2026) =
+* NEW: WhatsApp integration via the Meta Cloud API (no companion bot required)
+* Visitors can chat with you on WhatsApp - messages arrive in the admin dashboard like any other conversation, with replies delivered back to their WhatsApp
+* Optional Chat on WhatsApp link in the front-end chat bubble
+* Forward every chat message to your personal WhatsApp for instant phone notifications - quote-reply from your phone to answer, routed back to the right conversation
+* Replies from Discord now reach WhatsApp visitors and vice versa - all channels stay in sync
+* WhatsApp settings tab with webhook config display, test connection button and re-engagement template support for Meta's 24-hour reply window
+* Conversation list now shows a channel badge (WhatsApp/Discord) and WhatsApp conversations show phone number and reply-window status in the sidebar
 
 = 1.10.5 (20th July 2026) =
 * Updated super-speedy-settings to the latest version
